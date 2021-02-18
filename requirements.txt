@@ -1,1 +1,7 @@
 jax
+jaxlib
+datasets
+
+# Flax and Transfomers Fork
+-e git+git://github.com/CoderPat/transformers.git@master#egg=transformers
+-e git+git://github.com/CoderPat/flax.git@master#egg=flax
