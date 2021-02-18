@@ -2,15 +2,12 @@ from datasets import load_dataset
 from transformers import PreTrainedTokenizerFast
 from numpy import random
 
-teacher_valid_size=2000
-student_valid_size=2000
-student_test_size =2000
+teacher_valid_size = 2000
+student_valid_size = 2000
+student_test_size = 2000
 
-def load_data(
-    dataset: str, 
-    model: str,
-    split: str
-):
+
+def load_data(dataset: str, model: str, split: str):
     """
     Dataset reader function used for loading:
     text and labels for training, development and testing.
@@ -19,14 +16,14 @@ def load_data(
         dataset: tag to retrieve a HF dataset;
         model: the model type (either teacher or student) to which we are retrieving the data
         split: flag to return the train/validation/test set.
-    
+
     Returns:
-        List of text and labels respective to the split of the dataset that 
+        List of text and labels respective to the split of the dataset that
         was chosen (already shuffled).
     """
 
     hf_dataset = load_dataset(dataset)
-    original_split = "train" if model == "teacher" else "test"    
+    original_split = "train" if model == "teacher" else "test"
     data = hf_dataset[original_split]
 
     data = list(data)
@@ -48,11 +45,12 @@ def load_data(
             data = data[-dev_size:-student_test_size]
         elif split == "test":
             data = data[-student_test_size:]
-        
+
     for sample in data:
         sample["text"] = sample["text"].replace("<br /><br />", " ")
 
     return data
+
 
 def dataloader(
     dataset: list[dict[str, int]],
@@ -73,6 +71,8 @@ def dataloader(
             batch_inputs.append(tokens)
             batch_outputs.append(jnp.array(labels))
 
-        batch_inputs = tokenizer(batch_inputs, padding=True, truncation=True, return_tensors="jax")
+        batch_inputs = tokenizer(
+            batch_inputs, padding=True, truncation=True, return_tensors="jax"
+        )
         batch_outputs = jnp.stack(batch_outputs)
         yield batch_inputs, batch_outputs
