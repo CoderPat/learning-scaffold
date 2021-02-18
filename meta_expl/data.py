@@ -1,5 +1,7 @@
 from datasets import load_dataset
 from transformers import PreTrainedTokenizerFast
+
+import jax.numpy as jnp
 from numpy import random
 
 teacher_valid_size = 2000
