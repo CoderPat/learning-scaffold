@@ -17,3 +17,37 @@ Other requirements can be install by running
 ```bash
 pip install -r requirements
 ```
+
+## Running
+
+To train a teacher model run
+
+```bash
+python meta_expl/train.py --model-dir $teacher_dir
+```
+
+To train a student model learning from the  with `num_samples` training examples, run
+
+```bash
+python meta_expl/train.py \
+      --model-type student \
+      --num-examples $num_examples \
+      --teacher-dir $teacher_dir 
+```
+
+## Workflows
+
+To run experiments using the workflow manager [ducttape](https://github.com/jhclark/ducttape), modify the relevant variables in `tapes/main.tconf`.
+Also place [these scripts](https://gist.github.com/CoderPat/daa604ddb3d5a779dc2029509552e013) somewhere in your `$PATH`
+
+Then run the experiments using 
+
+```bash
+ducttape tapes/main.tape -C tapes/main.tconf -p train_student -j $num_parallel_jobs
+```
+
+You can then get a summary of the results by running 
+
+```bash
+ducttape tapes/main.tape -C tapes/main.tconf summary TrainStudent
+```

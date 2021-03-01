@@ -1,0 +1,25 @@
+global {
+    ducttape_output="/home/patrick/meta_expl_experiments-test"
+    ducttape_experimental_submitters=enable
+    repo="/home/patrick/repos/meta-expl"
+    seed=0
+
+    num_examples=(
+        NumExamples:
+            500=500
+            1000=1000
+            2000=2000
+            4000=4000
+            8000=8000
+    )
+    kld_coeff=(
+        KLDCoeff:
+            0=0.
+            1=1.
+    )
+
+}
+
+plan train_student {
+    reach TrainStudent via (NumExamples: 500 1000 2000 4000 8000) * (KLDCoeff: 0 1)
+}
