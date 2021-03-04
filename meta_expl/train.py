@@ -114,7 +114,7 @@ def train_step_with_teacher(
         logits, student_attn = student.apply(
             student_params, **x, deterministic=False, output_attentions=True
         )
-        kl_loss = attention_div(teacher_attn, student_attn)
+        kl_loss = attention_div(student_attn, teacher_attn)
         loss = cross_entropy_loss(logits, y)
         return loss + kld_coeff * kl_loss, logits
 
@@ -170,7 +170,7 @@ def main():
         ):
             if simulability:
                 y = jnp.argmax(teacher.apply(teacher_params, **x)[0], axis=-1)
-    
+
             loss, acc = eval_step(classifier, params, x, y)
             total_loss += loss * y.shape[0]
             total_correct += acc * y.shape[0]
