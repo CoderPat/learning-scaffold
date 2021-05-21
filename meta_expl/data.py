@@ -1,3 +1,4 @@
+from typing import List, Dict
 from datasets import load_dataset
 from transformers import PreTrainedTokenizerFast
 
@@ -64,7 +65,7 @@ def load_data(
 
 
 def dataloader(
-    dataset: list[dict[str, int]],
+    dataset: List[Dict[str, int]],
     tokenizer: PreTrainedTokenizerFast,
     batch_size: int,
     shuffle: bool = True,

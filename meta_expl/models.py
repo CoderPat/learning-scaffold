@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Dict, List
 import os
 import json
 
@@ -7,7 +7,7 @@ import flax.linen as nn
 import jax
 import jax.numpy as jnp
 
-from transformers import FlaxBertModel
+from transformers import FlaxBertModel, BertConfig
 from transformers.models.bert.modeling_flax_bert import FlaxBertModule
 
 from meta_expl.utils import is_jsonable
@@ -40,6 +40,7 @@ class BertClassifier(nn.Module):
         token_type_ids=None,
         position_ids=None,
         output_attentions=False,
+        unnormalized_attention=False,
         deterministic: bool = True,
     ):
         if token_type_ids is None:
@@ -49,7 +50,7 @@ class BertClassifier(nn.Module):
         if attention_mask is None:
             attention_mask = jnp.ones_like(input_ids)
 
-        bert_module = FlaxBertModule(
+        config = BertConfig(
             vocab_size=self.vocab_size,
             hidden_size=self.hidden_size,
             type_vocab_size=self.type_vocab_size,
@@ -62,12 +63,17 @@ class BertClassifier(nn.Module):
             hidden_act=self.hidden_act,
             dtype=self.dtype,
         )
+        bert_module = FlaxBertModule(
+            config=config
+        )
+
         _, pooled, attn = bert_module(
             input_ids,
             attention_mask=attention_mask,
             token_type_ids=token_type_ids,
             position_ids=position_ids,
             output_attentions=output_attentions,
+            unnormalized_attention=unnormalized_attention,
         )
         return nn.Dense(self.num_classes)(pooled), attn
 
@@ -104,11 +110,15 @@ def create_model(
     params["params"]["FlaxBertModule_0"] = model.params
     params = flax.core.freeze(params)
 
-    return classifier, params
+    # create dummy state for initalizing an explainer
+    _, state = classifier.apply(
+        params, dummy_inputs, output_attentions=True, unnormalized_attention=True
+    )
+    return classifier, params, state
 
 
 def save_model(
-    model_dir: str, model: nn.Module, params: dict[str, Any], suffix: str = "best"
+    model_dir: str, model: nn.Module, params: Dict[str, Any], suffix: str = "best"
 ):
     if not os.path.exists(model_dir):
         os.makedirs(model_dir)
@@ -139,4 +149,9 @@ def load_model(
     with open(os.path.join(model_dir, f"model_{suffix}.ckpt"), "rb") as f:
         params = flax.serialization.from_bytes(params, f.read())
 
-    return classifier, params
+    # create dummy state for initalizing an explainer
+    _, state = classifier.apply(
+        params, dummy_inputs, output_attentions=True, unnormalized_attention=True
+    )
+
+    return classifier, params, state

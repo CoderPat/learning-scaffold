@@ -1,4 +1,6 @@
+from typing import Union, Tuple, Iterator
 import json
+import jax
 import jax.numpy as jnp
 import flax.linen as nn
 from flax.training import common_utils
@@ -24,20 +26,6 @@ def cross_entropy_loss(logits, targets):
     return loss.mean()
 
 
-def attention_div(student_attn, teacher_attn):
-    # get the last layer attention for the CLS token, averaged across heads
-    student_attn = jnp.mean(student_attn[:, -1, :, 0, :], axis=1)
-    teacher_attn = jnp.mean(teacher_attn[:, -1, :, 0, :], axis=1)
-
-    # make sure to remove places where attention is zero to avoid nans
-    # this is fine since these will get zeroed out in the KL computation
-    log_student_attn = jnp.log(jnp.where(student_attn == 0, 1, student_attn))
-    log_teacher_attn = jnp.log(jnp.where(teacher_attn == 0, 1, teacher_attn))
-
-    kl_div = jnp.sum(student_attn * (log_student_attn - log_teacher_attn), axis=-1)
-    return kl_div.mean()
-
-
 def adamw_with_clip(
     learning_rate: float,
     b1: float = 0.9,
@@ -61,3 +49,69 @@ def is_jsonable(x):
         return True
     except (TypeError, OverflowError):
         return False
+
+
+class PRNGSequence(Iterator[jax.random.PRNGKey]):
+    """
+    Iterator of JAX random keys.
+
+    Inspired by the equivalent Haiku class
+    """
+
+    def __init__(self, key_or_seed: Union[jax.random.PRNGKey, int]):
+        """Creates a new :class:`PRNGSequence`."""
+        if isinstance(key_or_seed, int):
+            key_or_seed = jax.random.PRNGKey(key_or_seed)
+
+        self._key = key_or_seed
+
+    def __next__(self) -> jax.random.PRNGKey:
+        self._key, subkey = jax.random.split(self._key)
+        return subkey
+
+    next = __next__
+
+    def take(self, num: int) -> Tuple[jax.random.PRNGKey, ...]:
+        keys = jax.random.split(self._key, num + 1)
+        self._key = keys[0]
+        return keys[1:]
+
+
+def multiply_no_nan(x, y):
+    return jnp.where(x == 0, 0, x * y)
+
+
+LOWER_CONST = 1e-7
+UPPER_CONST = 1 - LOWER_CONST
+
+
+def logprobs(probs):
+    probs = jnp.maximum(probs, LOWER_CONST)
+    probs = jnp.minimum(probs, UPPER_CONST)
+    return jnp.log(probs)
+
+
+def accumulate_gradient(loss_and_grad_fn, params, images, labels, accum_steps):
+    """Accumulate gradient over multiple steps to save on memory."""
+    if accum_steps and accum_steps > 1:
+        assert (
+            images.shape[0] % accum_steps == 0
+        ), f"Bad accum_steps {accum_steps} for batch size {images.shape[0]}"
+        step_size = images.shape[0] // accum_steps
+        l, g = loss_and_grad_fn(params, images[:step_size], labels[:step_size])
+
+        def acc_grad_and_loss(i, l_and_g):
+            imgs = jax.lax.dynamic_slice(
+                images, (i * step_size, 0, 0, 0), (step_size,) + images.shape[1:]
+            )
+            lbls = jax.lax.dynamic_slice(
+                labels, (i * step_size, 0), (step_size, labels.shape[1])
+            )
+            li, gi = loss_and_grad_fn(params, imgs, lbls)
+            l, g = l_and_g
+            return (l + li, jax.tree_multimap(lambda x, y: x + y, g, gi))
+
+        l, g = jax.lax.fori_loop(1, accum_steps, acc_grad_and_loss, (l, g))
+        return jax.tree_map(lambda x: x / accum_steps, (l, g))
+    else:
+        return loss_and_grad_fn(params, images, labels)

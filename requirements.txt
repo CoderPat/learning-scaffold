@@ -1,6 +1,7 @@
 jax
 jaxlib
 datasets
+optax
 
 # Flax and Transfomers Fork
 git+git://github.com/CoderPat/transformers.git@master#egg=transformers
