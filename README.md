@@ -43,11 +43,11 @@ Also place [these scripts](https://gist.github.com/CoderPat/daa604ddb3d5a779dc20
 Then run the experiments using 
 
 ```bash
-ducttape tapes/main.tape -C tapes/main.tconf -p train_student -j $num_parallel_jobs
+ducttape tapes/main.tape -C tapes/main.tconf -p TrainStudent -j $num_parallel_jobs
 ```
 
 You can then get a summary of the results by running 
 
 ```bash
-ducttape tapes/main.tape -C tapes/main.tconf summary TrainStudent
+ducttape tapes/main.tape -C tapes/main.tconf summary 
 ```

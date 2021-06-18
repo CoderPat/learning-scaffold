@@ -4,5 +4,5 @@ datasets
 optax
 
 # Flax and Transfomers Fork
-git+git://github.com/CoderPat/transformers.git@master#egg=transformers
-git+git://github.com/CoderPat/flax.git@master#egg=flax
+git+git://github.com/CoderPat/transformers.git@unnormalized-attention#egg=transformers
+git+git://github.com/CoderPat/flax.git@custom-attention#egg=flax
