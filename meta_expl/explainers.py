@@ -1,26 +1,24 @@
-from typing import Dict, Any
-import os
 import json
+import os
 from functools import partial
+from typing import Any, Dict
 
-import jax
-import jax.numpy as jnp
 import flax
 import flax.linen as nn
+import jax
+import jax.numpy as jnp
+from entmax_jax import entmax15, sparsemax
+from entmax_jax.losses import entmax_loss, softmax_loss, sparsemax_loss
 
-from entmax_jax import sparsemax, entmax15, entmax
-from entmax_jax.losses import sparsemax_loss, softmax_loss, entmax_loss
-
-from meta_expl.utils import multiply_no_nan, logprobs
 from meta_expl.utils import is_jsonable
 
 
 def average_attention(attention, logit_space: bool, norm_function: callable):
     if logit_space:
-        attention_logits = jnp.mean(attention[:, -1, :, 0, :], axis=1)
+        attention_logits = jnp.mean(attention[-1][:, :, 0, :], axis=1)
         return norm_function(attention_logits, axis=-1)
     else:
-        attention = norm_function(attention[:, -1, :, 0, :], axis=-1)
+        attention = norm_function(attention[-1][:, :, 0, :], axis=-1)
         return jnp.mean(attention, axis=1)
 
 
@@ -33,16 +31,31 @@ class SparsemaxExplainer(nn.Module):
 
 
 class Entmax15Explainer(nn.Module):
+    parametrized: bool = False
+
     @nn.compact
     def __call__(self, attention):
-        attention_logits = jnp.mean(attention[:, -1, :, 0, :], axis=1)
-        attention = entmax15(attention_logits, axis=-1)
-        return attention, {"z": attention_logits}
+        if not self.parametrized:
+            attention_logits = jnp.mean(attention[-1][:, :, 0, :], axis=1)
+            attention = entmax15(attention_logits, axis=-1)
+            return attention, {"z": attention_logits}
+        else:
+            # atom = self.param("atom", lambda rng, shape: jnp.ones(shape), ())
+            # attention_logits = jnp.mean(attention[:, -1, :, 0, :], axis=1) * atom
+            headcoeffs = self.param(
+                "head_coeffs",
+                lambda rng, shape: jnp.ones(shape) / shape,
+                attention[-1].shape[1],
+            )
+            attention_logits = jnp.einsum(
+                "h,bht->bt", headcoeffs, attention[-1][:, :, 0, :]
+            )
+            return entmax15(attention_logits, axis=-1), {"z": attention_logits}
 
 
 class SoftmaxExplainer(nn.Module):
-    logit_space: bool = False
-    parametrized: bool = True
+    logit_space: bool = True
+    parametrized: bool = False
 
     @nn.compact
     def __call__(self, attention):
@@ -54,22 +67,22 @@ class SoftmaxExplainer(nn.Module):
             headcoeffs = self.param(
                 "head_coeffs",
                 lambda rng, shape: jnp.ones(shape) / shape,
-                attention.shape[2],
+                attention[-1].shape[1],
             )
             attention_logits = jnp.einsum(
-                "h,bht->bt", headcoeffs, attention[:, -1, :, 0, :]
+                "h,bht->bt", headcoeffs, attention[-1][:, :, 0, :]
             )
             return nn.softmax(attention_logits, axis=-1), None
 
 
 class TopkExplainer(nn.Module):
-    logit_space: bool = False
+    logit_space: bool = True
     k: float = 0.1
 
     @nn.compact
     def __call__(self, attention):
         # calculate number of tokens to take for eveyy sample
-        num_tokens = jnp.sum(attention[:, -1, 0, 0, :] > -1e10, axis=-1)
+        num_tokens = jnp.sum(attention[-1][:, 0, 0, :] > -1e10, axis=-1)
         num_topk = jnp.ceil(self.k * num_tokens).astype(int)
 
         attention = average_attention(attention, self.logit_space, jax.nn.softmax)
@@ -90,11 +103,14 @@ class TopkExplainer(nn.Module):
 
 
 EXPLAINER_MAP = {
-    "sparsemax": SparsemaxExplainer,
-    "entmax15": Entmax15Explainer,
-    "softmax": SoftmaxExplainer,
-    "topk_softmax": TopkExplainer
+    "sparsemax": (SparsemaxExplainer, {}),
+    "entmax15": (Entmax15Explainer, {}),
+    "entmax15_param": (Entmax15Explainer, {"parametrized": True}),
+    "softmax": (SoftmaxExplainer, {}),
+    "softmax_param": (SoftmaxExplainer, {"parametrized": True}),
+    "topk_softmax": (TopkExplainer, {}),
 }
+
 
 def create_explainer(
     rng: jax.random.PRNGKey,
@@ -102,7 +118,8 @@ def create_explainer(
     explainer_type: str = "softmax",
 ):
     try:
-        explainer = EXPLAINER_MAP[explainer_type]()
+        explainer_cls, explainer_args = EXPLAINER_MAP[explainer_type]
+        explainer = explainer_cls(**explainer_args)
     except IndexError:
         raise ValueError("unknown explanation type")
 
@@ -113,7 +130,7 @@ def create_explainer(
 def explanation_loss(
     student_expl, teacher_expl, student_explainer, teacher_explainer, **extras
 ):
-    """ loss for explanations """
+    """loss for explanations"""
     if isinstance(student_explainer, SparsemaxExplainer) and isinstance(
         teacher_explainer, SparsemaxExplainer
     ):
@@ -132,6 +149,7 @@ def explanation_loss(
     else:
         ValueError("Unknown teacher/student explainer combination type")
 
+
 def save_explainer(
     model_dir: str, explainer: nn.Module, params: Dict[str, Any], suffix: str = "best"
 ):
@@ -141,6 +159,10 @@ def save_explainer(
     with open(os.path.join(model_dir, f"model_{suffix}.ckpt"), "wb") as f:
         f.write(flax.serialization.to_bytes(params))
     with open(os.path.join(model_dir, "config.json"), "w") as f:
-        serializable_args = {k: v for k, v in explainer.__dict__.items() if is_jsonable(v)}
-        serializable_args["explainer_type"] = dict(map(reversed, EXPLAINER_MAP.items()))[type(explainer)]
+        serializable_args = {
+            k: v for k, v in explainer.__dict__.items() if is_jsonable(v)
+        }
+        serializable_args["explainer_type"] = {
+            v[0]: k for k, v in EXPLAINER_MAP.items()
+        }[type(explainer)]
         json.dump(serializable_args, f)

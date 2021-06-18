@@ -1,6 +1,6 @@
-import jax
-import jax.numpy as jnp
 from functools import partial
+
+import jax
 
 
 def debug_foriloop(s, e, body, vars):

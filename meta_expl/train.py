@@ -1,26 +1,21 @@
-from typing import Dict, List
 import argparse
 from functools import partial
 from itertools import cycle
-import pkbar
-import numpy as np
+from typing import Dict
 
+import flax.linen as nn
 import jax
 import jax.numpy as jnp
-import flax.linen as nn
+import numpy as np
 import optax
+import pkbar
+from transformers import ElectraTokenizerFast
 
-from transformers import BertTokenizerFast
-
+from meta_expl.data import dataloader, load_data
 from meta_expl.explainers import create_explainer, explanation_loss, save_explainer
-from meta_expl.models import create_model, load_model, save_model
-from meta_expl.data import load_data, dataloader
-from meta_expl.utils import (
-    cross_entropy_loss,
-    adamw_with_clip,
-    PRNGSequence,
-)
 from meta_expl.hypergrad import hypergrad
+from meta_expl.models import create_model, load_model, save_model
+from meta_expl.utils import PRNGSequence, adamw_with_clip, cross_entropy_loss
 
 
 def read_args():
@@ -33,18 +28,26 @@ def read_args():
     )
     parser.add_argument(
         "--teacher-explainer",
-        choices=["softmax", "entmax15", "sparsemax", "topk_softmax"],
+        choices=[
+            "softmax",
+            "entmax15",
+            "sparsemax",
+            "topk_softmax",
+            "softmax_param",
+            "entmax15_param",
+        ],
         default="softmax",
     )
     parser.add_argument(
         "--student-explainer",
-        choices=["softmax", "entmax15", "sparsemax"],
+        choices=["softmax", "entmax15", "sparsemax", "softmax_param", "entmax15_param"],
         default="softmax",
     )
+    parser.add_argument("--arch", default="electra", choices=["electra"])
     parser.add_argument("--num-examples", type=int, default=None)
     parser.add_argument("--kld-coeff", type=float, default=1.0, help="")
     parser.add_argument(
-        "--num-epochs", default=5, type=int, help="number of training epochs"
+        "--num-epochs", default=20, type=int, help="number of training epochs"
     )
     parser.add_argument("--metalearn-interval", default=None, type=int, help="TODO")
     parser.add_argument(
@@ -53,6 +56,7 @@ def read_args():
         type=float,
         help="learning rate for the optimizer",
     )
+    parser.add_argument("--meta-lr", default=1e-4, type=float)
     parser.add_argument(
         "--clip-grads",
         default=1.0,
@@ -65,7 +69,7 @@ def read_args():
     parser.add_argument(
         "--meta-batch-size",
         type=int,
-        default=2,
+        default=16,
         help="Batch size to use during meta-training",
     )
     parser.add_argument(
@@ -85,10 +89,16 @@ def read_args():
         "--teacher-explainer-dir",
         type=str,
         default=None,
-        help="Directory to save the trained teacher explainer. "
+        help="Directory to save the trained teacher explainer. ",
     )
     parser.add_argument(
         "--model-dir",
+        type=str,
+        default=None,
+        help="Directory to save the model",
+    )
+    parser.add_argument(
+        "--explainer-dir",
         type=str,
         default=None,
         help="Directory to save the model",
@@ -113,13 +123,14 @@ def train_step(
     update_fn,
     params,
     opt_state,
+    rng,
     x: Dict["str", jnp.array],
     y: jnp.array,
 ):
-    """ Train step """
+    """Train step"""
 
     def loss_fn(params):
-        logits, _ = model.apply(params, **x, deterministic=False)
+        logits = model.apply(params, **x, deterministic=False, rngs={"dropout": rng})[0]
         loss = cross_entropy_loss(logits, y)
         return loss, logits
 
@@ -141,18 +152,19 @@ def train_step_with_teacher(
     teacher_params,
     teacher_explainer_params,
     opt_state,
+    rng,
     x: Dict["str", jnp.array],
     y: jnp.array,
     expl_coeff: float,
 ):
-    """ Train step for a model trained with attention supervision by a teacher """
+    """Train step for a model trained with attention supervision by a teacher"""
     # compute teacher prediction and attention
     t_logits, teacher_attn = teacher.apply(
         teacher_params,
         **x,
         deterministic=True,
         output_attentions=True,
-        unnormalized_attention=True,
+        unnorm_attention=True,
     )
     y_teacher = jnp.argmax(t_logits, axis=-1)
     teacher_expl, _ = teacher_explainer.apply(teacher_explainer_params, teacher_attn)
@@ -166,7 +178,8 @@ def train_step_with_teacher(
             **x,
             deterministic=False,
             output_attentions=True,
-            unnormalized_attention=True,
+            unnorm_attention=True,
+            rngs={"dropout": rng},
         )
         main_loss = cross_entropy_loss(logits, y_teacher)
 
@@ -210,6 +223,7 @@ def metatrain_step(
     teacher_params,
     teacher_explainer_params,
     metaopt_state,
+    rng,
     train_x: Dict["str", jnp.array],
     train_y: jnp.array,
     valid_x: Dict["str", jnp.array],
@@ -222,7 +236,7 @@ def metatrain_step(
         **train_x,
         deterministic=True,
         output_attentions=True,
-        unnormalized_attention=True,
+        unnorm_attention=True,
     )
     y_teacher = jnp.argmax(t_logits, axis=-1)
 
@@ -236,7 +250,8 @@ def metatrain_step(
             **train_x,
             deterministic=False,
             output_attentions=True,
-            unnormalized_attention=True,
+            unnorm_attention=True,
+            rngs={"dropout": rng},
         )
         main_loss = cross_entropy_loss(logits, y_teacher)
 
@@ -247,7 +262,7 @@ def metatrain_step(
         teacher_expl, _ = teacher_explainer.apply(
             teacher_explainer_params, teacher_attn
         )
-        mean_teacher_expl_size = jnp.sum(teacher_expl > 0)
+        # mean_teacher_expl_size = jnp.sum(teacher_expl > 0)
         expl_loss = explanation_loss(
             student_expl,
             teacher_expl,
@@ -264,7 +279,7 @@ def metatrain_step(
         **valid_x,
         deterministic=True,
         output_attentions=True,
-        unnormalized_attention=True,
+        unnorm_attention=True,
     )
     v_y_teacher = jnp.argmax(v_t_logits, axis=-1)
 
@@ -275,9 +290,9 @@ def metatrain_step(
         logits, student_attn = student.apply(
             student_params,
             **valid_x,
-            deterministic=False,
+            deterministic=True,
             output_attentions=True,
-            unnormalized_attention=True,
+            unnorm_attention=True,
         )
         return cross_entropy_loss(logits, v_y_teacher)
 
@@ -295,8 +310,8 @@ def metatrain_step(
 
 @partial(jax.jit, static_argnums=(0,))
 def eval_step(model, params, x, y):
-    """ Evaluation step """
-    logits, _ = model.apply(params, **x)
+    """Evaluation step"""
+    logits = model.apply(params, **x)[0]
     loss = cross_entropy_loss(logits, y)
     acc = jnp.mean(jnp.argmax(logits, axis=-1) == y)
     return loss, acc
@@ -317,12 +332,19 @@ def main():
 
     # load model and tokenizer
     classifier, params, dummy_state = create_model(
-        next(keyseq), num_classes, args.batch_size, args.max_len
+        next(keyseq), num_classes, args.arch, args.batch_size, args.max_len
     )
     explainer, explainer_params = create_explainer(
         next(keyseq), dummy_state, explainer_type=args.student_explainer
     )
-    tokenizer = BertTokenizerFast.from_pretrained("bert-base-cased")
+    if args.arch == "electra":
+        tokenizer = ElectraTokenizerFast.from_pretrained(
+            "google/electra-small-discriminator"
+        )
+    elif args.arch == "bert":
+        raise ValueError("not implemented")
+    else:
+        raise ValueError("unknown model type")
 
     # load teacher model for training student
     if args.teacher_dir is not None:
@@ -340,9 +362,9 @@ def main():
         opt_state = optimizer.init((params, explainer_params))
     else:
         opt_state = optimizer.init(params)
-        
+
     if args.metalearn_interval is not None:
-        metaoptimizer = adamw_with_clip(args.learning_rate, max_norm=args.clip_grads)
+        metaoptimizer = adamw_with_clip(args.meta_lr, max_norm=args.clip_grads)
         metaopt_state = metaoptimizer.init(teacher_explainer_params)
 
     # define evaluation loop
@@ -407,7 +429,7 @@ def main():
         ):
             if args.model_type == "teacher":
                 loss, params, opt_state = train_step(
-                    classifier, optimizer.update, params, opt_state, x, y
+                    classifier, optimizer.update, params, opt_state, next(keyseq), x, y
                 )
                 mtes = 0
             else:
@@ -427,6 +449,7 @@ def main():
                     teacher_params,
                     teacher_explainer_params,
                     opt_state,
+                    next(keyseq),
                     x,
                     y,
                     args.kld_coeff,
@@ -454,6 +477,7 @@ def main():
                     teacher_params,
                     teacher_explainer_params,
                     metaopt_state,
+                    next(keyseq),
                     train_x,
                     train_y,
                     valid_x,
@@ -461,20 +485,32 @@ def main():
                     args.kld_coeff,
                 )
 
-        valid_loss, valid_metric = evaluate(valid_data, params, simulability=args.model_type=="student")
+        print(teacher_explainer_params)
+        valid_loss, valid_metric = evaluate(
+            valid_data, params, simulability=args.model_type == "student"
+        )
         if valid_metric > best_metric:
             best_metric = valid_metric
             best_params = params
             if args.model_dir is not None:
                 save_model(args.model_dir, classifier, params)
+            if args.explainer_dir is not None:
+                save_explainer(args.explainer_dir, explainer, explainer_params)
             if args.teacher_explainer_dir is not None:
-                save_explainer(args.teacher_explainer_dir, teacher_explainer, teacher_explainer_params)
+                save_explainer(
+                    args.teacher_explainer_dir,
+                    teacher_explainer,
+                    teacher_explainer_params,
+                )
 
         bar.add(
             1,
             values=[
                 ("valid_loss", valid_loss),
-                (f"valid_{'sim' if args.model_type=='student' else 'acc'}", valid_metric),
+                (
+                    f"valid_{'sim' if args.model_type=='student' else 'acc'}",
+                    valid_metric,
+                ),
                 ("train_mtes", total_mtes / seen_samples),
             ],
         )

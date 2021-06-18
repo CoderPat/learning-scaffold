@@ -1,15 +1,17 @@
 global {
-    ducttape_output="/home/patrick/meta_expl_experiments-test-2"
-    ducttape_experimental_submitters=enable
-    repo="/home/patrick/repos/meta-expl"
+    ducttape_output="/projects/tir4/users/pfernand/workflows-outputs/meta-expl-experiments"
+    ducttape_experimental_submitters=true
+    ducttape_experimental_imports=true
+    repo="/home/pfernand/repos/meta-expl"
     seed=(
       Seed:
         0=0
         1=1
-        2=2
-        3=3
-        4=4
     )
+        #2=2
+        #3=3
+        #4=4
+    #)
     num_examples=(
         NumExamples:
             500=500
@@ -22,10 +24,60 @@ global {
         KLDCoeff:
             0=0.
             1=1.
+            5=5.
+    )
+    teacher_explainer=(
+        TeacherExplainer:
+            entmax="entmax15"
+            softmax="softmax"
+            topk="topk_softmax"
+            sparsemax="sparsemax"
+            softmax_param="softmax_param"
+            entmax_param="entmax15_param"
+    )
+    student_explainer=(
+        StudentExplainer:
+            entmax="entmax15"
+            softmax="softmax"
+            sparsemax="sparsemax"
+            softmax_param="softmax_param"
+            entmax_param="entmax15_param"
     )
 
+    metalearn=(
+        MetaLearn:
+            false=false
+            true=true
+    )
+    meta_lr=(
+        MetaLR:
+            1e4=1e-4
+            1e3=1e-3
+            1e2=1e-2
+    )
+    meta_interval=(
+        MetaInterval:
+            10=10
+            50=50
+            500=500
+    )
+
+    submitter=slurm
 }
 
-plan train_student {
-    reach AverageResults via (NumExamples: 500 1000 2000 4000 8000) * (KLDCoeff: 0 1)
+plan TrainTeacher {
+    reach TrainTeacher
+}
+
+plan TrainStudent {
+    #reach AverageResults via (NumExamples: 500 1000 2000 4000 8000) * (KLDCoeff: *) * (TeacherExplainer: softmax) * (StudentExplainer: softmax)
+    #reach AverageResults via (NumExamples: 500 1000 2000 4000 8000) * (KLDCoeff: *) * (TeacherExplainer: topk) * (StudentExplainer: softmax)
+    #reach AverageResults via (NumExamples: 500 1000 2000 4000 8000) * (KLDCoeff: *) * (TeacherExplainer: entmax) * (StudentExplainer: entmax)
+    #reach AverageResults via (NumExamples: 500 1000 2000 4000 8000) * (KLDCoeff: *) * (TeacherExplainer: sparsemax) * (StudentExplainer: sparsemax)
+    reach AverageResults via (NumExamples: 500 1000 2000) * (KLDCoeff: 0 1) * (TeacherExplainer: softmax_param) * (StudentExplainer: softmax_param)
+}
+
+plan MetaTrain {
+    reach AverageResults via (NumExamples: 500 1000 2000) * (KLDCoeff: 1) * (MetaLearn: true) * (TeacherExplainer: softmax_param) * (StudentExplainer: softmax_param) * (MetaLR: 1e2 1e3) * (MetaInterval: 50)
+    #reach AverageResults via (NumExamples: 500 1000 2000) * (KLDCoeff: 1) * (MetaLearn: true) * (TeacherExplainer: entmax_param) * (StudentExplainer: entmax_param) * (MetaLR: 1e2 1e3) * (MetaInterval: 50)
 }

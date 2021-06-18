@@ -1,17 +1,17 @@
-from typing import Union, Tuple, Iterator
 import json
+from typing import Iterator, Tuple, Union
+
+import flax.linen as nn
 import jax
 import jax.numpy as jnp
-import flax.linen as nn
 from flax.training import common_utils
-
 from optax import (
     GradientTransformation,
+    additive_weight_decay,
     chain,
     clip_by_global_norm,
-    scale_by_adam,
-    additive_weight_decay,
     scale,
+    scale_by_adam,
 )
 
 
