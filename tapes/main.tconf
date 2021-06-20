@@ -7,11 +7,10 @@ global {
       Seed:
         0=0
         1=1
+        2=2
+        3=3
+        4=4
     )
-        #2=2
-        #3=3
-        #4=4
-    #)
     num_examples=(
         NumExamples:
             500=500
@@ -58,6 +57,9 @@ global {
     meta_interval=(
         MetaInterval:
             10=10
+            1=1
+            5=5
+            25=25
             50=50
             500=500
     )
@@ -78,6 +80,7 @@ plan TrainStudent {
 }
 
 plan MetaTrain {
-    reach AverageResults via (NumExamples: 500 1000 2000) * (KLDCoeff: 1) * (MetaLearn: true) * (TeacherExplainer: softmax_param) * (StudentExplainer: softmax_param) * (MetaLR: 1e2 1e3) * (MetaInterval: 50)
+    reach AverageResults via (NumExamples: 500 1000 2000) * (KLDCoeff: 1) * (MetaLearn: true) * (TeacherExplainer: softmax_param) * (StudentExplainer: softmax_param) * (MetaLR: 1e2 1e3) * (MetaInterval: 25 50)
+    reach AverageResults via (NumExamples: 500 1000 2000) * (KLDCoeff: 1) * (MetaLearn: true) * (TeacherExplainer: softmax_param) * (StudentExplainer: softmax_param) * (MetaLR: 1e3 1e4) * (MetaInterval: 1 5 10)
     #reach AverageResults via (NumExamples: 500 1000 2000) * (KLDCoeff: 1) * (MetaLearn: true) * (TeacherExplainer: entmax_param) * (StudentExplainer: entmax_param) * (MetaLR: 1e2 1e3) * (MetaInterval: 50)
 }
