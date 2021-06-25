@@ -187,7 +187,7 @@ def train_step_with_teacher(
         student_expl, s_extras = student_explainer.apply(
             student_explainer_params, student_attn
         )
-        mean_teacher_expl_size = jnp.sum(teacher_expl > 0)
+        mean_teacher_expl_size = jnp.mean(teacher_expl > 0)
         expl_loss = explanation_loss(
             student_expl,
             teacher_expl,
@@ -485,7 +485,7 @@ def main():
                     args.kld_coeff,
                 )
 
-        print(teacher_explainer_params)
+        # print(teacher_explainer_params)
         valid_loss, valid_metric = evaluate(
             valid_data, params, simulability=args.model_type == "student"
         )
