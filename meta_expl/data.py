@@ -69,6 +69,7 @@ def dataloader(
     batch_size: int,
     shuffle: bool = True,
     max_len: int = 64,
+    idxs: List[int] = None,
 ):
     """
     Dataloading function that takes a dataset and yields batcheds of data
@@ -78,16 +79,23 @@ def dataloader(
         tokenizer: a HugginFace (fast) tokenizer
         batch_size: the size of the batch
         shuffle: weather to shuffle the samples or not
+        idxs: a list of sample indices over which we want to iterate over,
+              if None, iterate over the full dataset (default).
     """
-    idxs = list(range(len(dataset)))
-    if shuffle:
-        random.shuffle(idxs)
+    if idxs is None:
+        idxs = list(range(len(dataset)))
+        if shuffle:
+            random.shuffle(idxs)
+    else:
+        assert isinstance(idxs, (list, tuple))
+        assert all(map(lambda x: isinstance(x, int), idxs))
     for i in range(0, len(idxs), batch_size):
-        batch_inputs, batch_outputs = [], []
+        batch_inputs, batch_outputs, batch_idxs = [], [], []
         for j in range(batch_size):
             if i + j >= len(idxs):
                 break
             labels, tokens = dataset[idxs[i + j]].values()
+            batch_idxs.append(idxs[i + j])
             batch_inputs.append(tokens)
             batch_outputs.append(jnp.array(labels))
 
@@ -101,4 +109,4 @@ def dataloader(
             )
         )
         batch_outputs = jnp.stack(batch_outputs)
-        yield batch_inputs, batch_outputs
+        yield batch_inputs, batch_outputs, batch_idxs
