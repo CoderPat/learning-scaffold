@@ -109,7 +109,13 @@ def read_args():
         help="Directory to save the model",
     )
     parser.add_argument(
+<<<<<<< HEAD
         "--meta-init", choices=["uniform", "random"], default="uniform"
+=======
+        "--pivot",
+        action="store_true",
+        help="Whether to use pivoting",
+>>>>>>> 14a385b4d359663a8e13f2c640d4417126da2d7f
     )
     parser.add_argument("--seed", type=int, default=0)
     args = parser.parse_args()
@@ -195,7 +201,7 @@ def train_step_with_teacher(
         student_expl, s_extras = student_explainer.apply(
             student_explainer_params, student_attn
         )
-        mean_teacher_expl_size = jnp.sum(teacher_expl > 0)
+        mean_teacher_expl_size = jnp.mean(teacher_expl > 0)
         expl_loss = explanation_loss(
             student_expl,
             teacher_expl,
@@ -378,7 +384,7 @@ def main():
     # define evaluation loop
     def evaluate(data, params, simulability=False):
         total, total_correct, total_loss = 0, 0, 0
-        for x, y in dataloader(
+        for x, y, _ in dataloader(
             data,
             tokenizer,
             batch_size=args.batch_size,
@@ -415,8 +421,9 @@ def main():
             width=10,
         )
         seen_samples = 0
+        seen_idxs = []
         total_mtes = 0
-        for step, (x, y) in enumerate(
+        for step, (x, y, idxs) in enumerate(
             dataloader(
                 train_data,
                 tokenizer,
@@ -432,6 +439,9 @@ def main():
                 )
                 mtes = 0
             else:
+                if args.pivot:
+                    copied_params = params
+                    copied_explainer_params = explainer_params
                 (
                     loss,
                     (params, explainer_params),
@@ -455,6 +465,7 @@ def main():
                 )
 
             total_mtes += mtes
+            seen_idxs.extend(idxs)
 
             seen_samples += y.shape[0]
             bar.update(seen_samples, values=[("train_loss", loss)])
@@ -482,6 +493,36 @@ def main():
                     valid_y,
                     args.kld_coeff,
                 )
+                if args.pivot:
+                    for x_, y_, _ in dataloader(
+                        train_data,
+                        tokenizer,
+                        batch_size=args.batch_size,
+                        max_len=args.max_len,
+                        shuffle=True,
+                        idxs=seen_idxs,
+                    ):
+                        (
+                            loss,
+                            (params, explainer_params),
+                            opt_state,
+                            mtes,
+                        ) = train_step_with_teacher(
+                            classifier,
+                            explainer,
+                            teacher,
+                            teacher_explainer,
+                            optimizer.update,
+                            copied_params,
+                            copied_explainer_params,
+                            teacher_params,
+                            teacher_explainer_params,
+                            opt_state,
+                            next(keyseq),
+                            x_,
+                            y_,
+                            args.kld_coeff,
+                        )
 
         valid_loss, valid_metric = evaluate(
             valid_data, params, simulability=args.model_type == "student"

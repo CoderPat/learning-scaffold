@@ -125,17 +125,6 @@ class TopkExplainer(nn.Module):
         return topk_attention / jnp.sum(topk_attention, axis=-1)[:, jnp.newaxis], None
 
 
-EXPLAINER_MAP = {
-    "sparsemax": (SparsemaxExplainer, {}),
-    "entmax15": (Entmax15Explainer, {}),
-    "entmax15_param": (Entmax15Explainer, {"parametrized": True}),
-    "softmax": (SoftmaxExplainer, {}),
-    "softmax_param": (SoftmaxExplainer, {"parametrized": True}),
-    "softmax_param_full": (SoftmaxExplainer, {"parametrized": True, "layer": None}),
-    "topk_softmax": (TopkExplainer, {}),
-}
-
-
 def create_explainer(
     rng: jax.random.PRNGKey,
     state,
@@ -191,3 +180,13 @@ def save_explainer(
             v[0]: k for k, v in EXPLAINER_MAP.items()
         }[type(explainer)]
         json.dump(serializable_args, f)
+
+
+EXPLAINER_MAP = {
+    "sparsemax": (SparsemaxExplainer, {}),
+    "entmax15": (Entmax15Explainer, {}),
+    "entmax15_param": (Entmax15Explainer, {"parametrized": True}),
+    "softmax": (SoftmaxExplainer, {}),
+    "softmax_param": (SoftmaxExplainer, {"parametrized": True}),
+    "topk_softmax": (TopkExplainer, {}),
+}
