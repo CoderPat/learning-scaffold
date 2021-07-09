@@ -109,7 +109,11 @@ def read_args():
         help="Directory to save the model",
     )
     parser.add_argument(
-        "--meta-init", choices=["uniform", "random"], default="uniform"
+        "--meta-init",
+        choices=["uniform", "random"],
+        default="uniform"
+    )
+    parser.add_argument(
         "--pivot",
         action="store_true",
         help="Whether to use pivoting",
