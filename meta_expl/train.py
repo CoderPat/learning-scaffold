@@ -103,6 +103,11 @@ def read_args():
         default=None,
         help="Directory to save the model",
     )
+    parser.add_argument(
+        "--pivot",
+        action='store_true',
+        help="Whether to use pivoting",
+    )
     parser.add_argument("--seed", type=int, default=0)
     args = parser.parse_args()
 
@@ -307,7 +312,6 @@ def metatrain_step(
     )
     return optax.apply_updates(teacher_explainer_params, updates), metaopt_state
 
-
 @partial(jax.jit, static_argnums=(0,))
 def eval_step(model, params, x, y):
     """Evaluation step"""
@@ -433,6 +437,9 @@ def main():
                 )
                 mtes = 0
             else:
+                if args.pivot:
+                    copied_params = params
+                    copied_explainer_params = explainer_params
                 (
                     loss,
                     (params, explainer_params),
@@ -464,6 +471,8 @@ def main():
                 args.metalearn_interval is not None
                 and step % args.metalearn_interval == 0
             ):
+                if args.pivot:
+                    assert args.metalearn_interval == 1
                 valid_x, valid_y = next(valid_dataloader)
                 train_x, train_y = next(metatrain_dataloader)
                 teacher_explainer_params, metaopt_state = metatrain_step(
@@ -484,8 +493,29 @@ def main():
                     valid_y,
                     args.kld_coeff,
                 )
+                if args.pivot:
+                    (
+                        loss,
+                        (params, explainer_params),
+                        opt_state,
+                        mtes,
+                    ) = train_step_with_teacher(
+                        classifier,
+                        explainer,
+                        teacher,
+                        teacher_explainer,
+                        optimizer.update,
+                        copied_params,
+                        copied_explainer_params,
+                        teacher_params,
+                        teacher_explainer_params,
+                        opt_state,
+                        next(keyseq),
+                        x,
+                        y,
+                        args.kld_coeff,
+                    )
 
-        # print(teacher_explainer_params)
         valid_loss, valid_metric = evaluate(
             valid_data, params, simulability=args.model_type == "student"
         )
