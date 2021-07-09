@@ -25,6 +25,7 @@ task TrainStudent
     :: meta_interval=@
     :: meta_lr=@
     :: meta_init=@
+    :: pivot=@
     :: seed=@
 {
     python $repo/meta_expl/train.py \
@@ -34,6 +35,7 @@ task TrainStudent
       --num-examples $num_examples \
       --kld-coeff $kld_coeff \
       $([ "$metalearn" = true ] && echo "--metalearn-interval $meta_interval --meta-lr $meta_lr --meta-init $meta_init" || echo "") \
+      $([ "$pivot" = true ] && echo "--pivot" || echo "") \
       --teacher-dir $teacher_dir \
       --model-dir $student_dir \
       --teacher-explainer-dir $teacher_expl_dir \
