@@ -1,7 +1,7 @@
 import json
 import os
 from functools import partial
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 import flax
 import flax.linen as nn
@@ -15,15 +15,16 @@ from meta_expl.utils import is_jsonable
 
 def average_attention(attention, logit_space: bool, norm_function: callable):
     if logit_space:
-        attention_logits = jnp.mean(attention[-1][:, :, 0, :], axis=1)
+        attention_logits = jnp.mean(attention[:, :, 0, :], axis=1)
         return norm_function(attention_logits, axis=-1)
     else:
-        attention = norm_function(attention[-1][:, :, 0, :], axis=-1)
+        attention = norm_function(attention[:, :, 0, :], axis=-1)
         return jnp.mean(attention, axis=1)
 
 
 class SparsemaxExplainer(nn.Module):
     logit_space: bool = True
+    init: str = "uniform"
 
     @nn.compact
     def __call__(self, attention):
@@ -32,23 +33,34 @@ class SparsemaxExplainer(nn.Module):
 
 class Entmax15Explainer(nn.Module):
     parametrized: bool = False
+    parametrized: bool = False
+    layer: Optional[int] = -1
+    init_fn: str = "uniform"
 
     @nn.compact
     def __call__(self, attention):
+        if self.layer is None:
+            attention = jnp.concatenate(attention, axis=1)
+        else:
+            attention = attention[self.layer]
+
+        if self.init_fn == "uniform":
+            init_fn = lambda rng, shape: jnp.ones(shape) / shape
+        elif self.init_fn == "random":
+            init_fn = nn.initializers.lecun_normal()
+
         if not self.parametrized:
-            attention_logits = jnp.mean(attention[-1][:, :, 0, :], axis=1)
+            attention_logits = jnp.mean(attention[:, :, 0, :], axis=1)
             attention = entmax15(attention_logits, axis=-1)
             return attention, {"z": attention_logits}
         else:
-            # atom = self.param("atom", lambda rng, shape: jnp.ones(shape), ())
-            # attention_logits = jnp.mean(attention[:, -1, :, 0, :], axis=1) * atom
             headcoeffs = self.param(
                 "head_coeffs",
-                lambda rng, shape: jnp.ones(shape) / shape,
-                attention[-1].shape[1],
+                init_fn,
+                (attention.shape[1],),
             )
             attention_logits = jnp.einsum(
-                "h,bht->bt", headcoeffs, attention[-1][:, :, 0, :]
+                "h,bht->bt", headcoeffs, attention[:, :, 0, :]
             )
             return entmax15(attention_logits, axis=-1), {"z": attention_logits}
 
@@ -56,21 +68,31 @@ class Entmax15Explainer(nn.Module):
 class SoftmaxExplainer(nn.Module):
     logit_space: bool = True
     parametrized: bool = False
+    layer: Optional[int] = -1
+    init_fn: str = "uniform"
 
     @nn.compact
     def __call__(self, attention):
+        if self.layer is None:
+            attention = jnp.concatenate(attention, axis=1)
+        else:
+            attention = attention[self.layer]
+
+        if self.init_fn == "uniform":
+            init_fn = lambda rng, shape: jnp.ones(shape[0]) / shape[0]
+        elif self.init_fn == "random":
+            init_fn = jax.nn.initializers.normal()
+
         if not self.parametrized:
             return average_attention(attention, self.logit_space, jax.nn.softmax), None
         else:
-            # atom = self.param("atom", lambda rng, shape: jnp.ones(shape), ())
-            # attention_logits = jnp.mean(attention[:, -1, :, 0, :], axis=1) * atom
             headcoeffs = self.param(
                 "head_coeffs",
-                lambda rng, shape: jnp.ones(shape) / shape,
-                attention[-1].shape[1],
+                init_fn,
+                (attention.shape[1],),
             )
             attention_logits = jnp.einsum(
-                "h,bht->bt", headcoeffs, attention[-1][:, :, 0, :]
+                "h,bht->bt", headcoeffs, attention[:, :, 0, :]
             )
             return nn.softmax(attention_logits, axis=-1), None
 
@@ -78,6 +100,7 @@ class SoftmaxExplainer(nn.Module):
 class TopkExplainer(nn.Module):
     logit_space: bool = True
     k: float = 0.1
+    init_fn: str = 'uniform'
 
     @nn.compact
     def __call__(self, attention):
@@ -108,6 +131,7 @@ EXPLAINER_MAP = {
     "entmax15_param": (Entmax15Explainer, {"parametrized": True}),
     "softmax": (SoftmaxExplainer, {}),
     "softmax_param": (SoftmaxExplainer, {"parametrized": True}),
+    "softmax_param_full": (SoftmaxExplainer, {"parametrized": True, "layer": None}),
     "topk_softmax": (TopkExplainer, {}),
 }
 
@@ -116,10 +140,11 @@ def create_explainer(
     rng: jax.random.PRNGKey,
     state,
     explainer_type: str = "softmax",
+    meta_init: str = 'uniform'
 ):
     try:
         explainer_cls, explainer_args = EXPLAINER_MAP[explainer_type]
-        explainer = explainer_cls(**explainer_args)
+        explainer = explainer_cls(**explainer_args, init_fn=meta_init)
     except IndexError:
         raise ValueError("unknown explanation type")
 

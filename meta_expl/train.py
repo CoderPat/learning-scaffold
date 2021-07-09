@@ -1,6 +1,7 @@
 import argparse
 from functools import partial
 from itertools import cycle
+from operator import not_
 from typing import Dict
 
 import flax.linen as nn
@@ -35,19 +36,23 @@ def read_args():
             "topk_softmax",
             "softmax_param",
             "entmax15_param",
+            "softmax_param_full"
         ],
         default="softmax",
     )
     parser.add_argument(
         "--student-explainer",
-        choices=["softmax", "entmax15", "sparsemax", "softmax_param", "entmax15_param"],
+        choices=["softmax", "entmax15", "sparsemax", "softmax_param", "entmax15_param", "softmax_param_full"],
         default="softmax",
     )
     parser.add_argument("--arch", default="electra", choices=["electra"])
     parser.add_argument("--num-examples", type=int, default=None)
     parser.add_argument("--kld-coeff", type=float, default=1.0, help="")
     parser.add_argument(
-        "--num-epochs", default=20, type=int, help="number of training epochs"
+        "--num-epochs", default=100, type=int, help="number of training epochs"
+    )
+    parser.add_argument(
+        "--patience", default=5, type=int, help="patience for early stopping"
     )
     parser.add_argument("--metalearn-interval", default=None, type=int, help="TODO")
     parser.add_argument(
@@ -102,6 +107,9 @@ def read_args():
         type=str,
         default=None,
         help="Directory to save the model",
+    )
+    parser.add_argument(
+        "--meta-init", choices=["uniform", "random"], default="uniform"
     )
     parser.add_argument("--seed", type=int, default=0)
     args = parser.parse_args()
@@ -335,7 +343,7 @@ def main():
         next(keyseq), num_classes, args.arch, args.batch_size, args.max_len
     )
     explainer, explainer_params = create_explainer(
-        next(keyseq), dummy_state, explainer_type=args.student_explainer
+        next(keyseq), dummy_state, explainer_type=args.student_explainer, meta_init=args.meta_init
     )
     if args.arch == "electra":
         tokenizer = ElectraTokenizerFast.from_pretrained(
@@ -352,7 +360,7 @@ def main():
             args.teacher_dir, batch_size=args.batch_size, max_len=args.max_len
         )
         teacher_explainer, teacher_explainer_params = create_explainer(
-            next(keyseq), dummy_state, explainer_type=args.teacher_explainer
+            next(keyseq), dummy_state, explainer_type=args.teacher_explainer, meta_init=args.meta_init,
         )
 
     # load optimizer
@@ -393,15 +401,6 @@ def main():
             valid_dataloader = cycle(
                 dataloader(
                     valid_data,
-                    tokenizer,
-                    batch_size=args.meta_batch_size,
-                    max_len=args.max_len,
-                    shuffle=True,
-                )
-            )
-            metatrain_dataloader = cycle(
-                dataloader(
-                    train_data,
                     tokenizer,
                     batch_size=args.meta_batch_size,
                     max_len=args.max_len,
@@ -465,7 +464,6 @@ def main():
                 and step % args.metalearn_interval == 0
             ):
                 valid_x, valid_y = next(valid_dataloader)
-                train_x, train_y = next(metatrain_dataloader)
                 teacher_explainer_params, metaopt_state = metatrain_step(
                     classifier,
                     explainer,
@@ -478,14 +476,13 @@ def main():
                     teacher_explainer_params,
                     metaopt_state,
                     next(keyseq),
-                    train_x,
-                    train_y,
+                    x,
+                    y,
                     valid_x,
                     valid_y,
                     args.kld_coeff,
                 )
 
-        print(teacher_explainer_params)
         valid_loss, valid_metric = evaluate(
             valid_data, params, simulability=args.model_type == "student"
         )
@@ -502,6 +499,9 @@ def main():
                     teacher_explainer,
                     teacher_explainer_params,
                 )
+            not_improved = 0
+        else:
+            not_improved += 1
 
         bar.add(
             1,
@@ -514,6 +514,9 @@ def main():
                 ("train_mtes", total_mtes / seen_samples),
             ],
         )
+
+        if not_improved > args.patience:
+            break
 
     if args.model_type == "student":
         test_data = load_data("imdb", "student", "test")
