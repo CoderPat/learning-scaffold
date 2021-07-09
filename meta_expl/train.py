@@ -474,8 +474,8 @@ def main():
                 args.metalearn_interval is not None
                 and step % args.metalearn_interval == 0
             ):
-                valid_x, valid_y = next(valid_dataloader)
-                train_x, train_y = next(metatrain_dataloader)
+                valid_x, valid_y, _ = next(valid_dataloader)
+                train_x, train_y, _ = next(metatrain_dataloader)
                 teacher_explainer_params, metaopt_state = metatrain_step(
                     classifier,
                     explainer,
@@ -495,14 +495,13 @@ def main():
                     args.kld_coeff,
                 )
                 if args.pivot:
-
                     for x_, y_, _ in dataloader(
                         train_data,
                         tokenizer,
                         batch_size=args.batch_size,
                         max_len=args.max_len,
                         shuffle=True,
-                        idxs=seen_idxs
+                        idxs=seen_idxs,
                     ):
                         (
                             loss,
