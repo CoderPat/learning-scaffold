@@ -375,7 +375,7 @@ def main():
     # define evaluation loop
     def evaluate(data, params, simulability=False):
         total, total_correct, total_loss = 0, 0, 0
-        for x, y in dataloader(
+        for x, y, _ in dataloader(
             data,
             tokenizer,
             batch_size=args.batch_size,
