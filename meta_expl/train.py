@@ -475,7 +475,7 @@ def main():
                 args.metalearn_interval is not None
                 and step % args.metalearn_interval == 0
             ):
-                valid_x, valid_y = next(valid_dataloader)
+                valid_x, valid_y, _ = next(valid_dataloader)
                 teacher_explainer_params, metaopt_state = metatrain_step(
                     classifier,
                     explainer,
