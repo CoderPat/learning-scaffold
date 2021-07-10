@@ -58,11 +58,17 @@ global {
             1=1
             5=5
     )
+    meta_init=(
+        MetaInit:
+            uniform=uniform
+            random=random
+    )
     pivot=(
         Pivot:
             false=false
             true=true
     )
+
 
     submitter=cuda_async
 }
@@ -86,5 +92,5 @@ plan MetaTrain {
 }
 
 plan ExplorePivot {
-    reach AverageResults via (NumExamples: 500 1000 2000) * (KLDCoeff: 1) * (MetaLearn: true) * (TeacherExplainer: softmax_param) * (StudentExplainer: softmax_param) * (MetaLR: 1e2 1e3) * (MetaInterval: *) * (Pivot: *)
+    reach AverageResults via (NumExamples: 500 1000 2000) * (KLDCoeff: 1) * (MetaLearn: true) * (TeacherExplainer: softmax_param) * (StudentExplainer: softmax_param) * (MetaLR: 1e2 1e3) * (MetaInterval: *) * (MetaInit: uniform) * (Pivot: *)
 }
