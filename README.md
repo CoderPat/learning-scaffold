@@ -9,8 +9,8 @@ Please refer to the project page to see how to install the correct version for y
 
 It also depends on two custom forks:
 
-* A [fork of Flax](https://github.com/CoderPat/flax)
-* A [fork of Transformers](https://github.com/CoderPat/transformers)
+* A [fork of Flax](https://github.com/CoderPat/flax/tree/custom-attention)
+* A [fork of Transformers](https://github.com/CoderPat/transformers/tree/unnormalized-attention)
 
 Other requirements can be install by running
 

@@ -84,16 +84,6 @@ plan TrainStudent {
 }
 
 plan MetaTrain {
-<<<<<<< HEAD
     reach AverageResults via (NumExamples: *) * (KLDCoeff: 1) * (MetaLearn: true) * (TeacherExplainer: *) * (MetaLR: 5e4) * (MetaInterval: *)
 }
-=======
-    #reach AverageResults via (NumExamples: 500 1000 2000) * (KLDCoeff: 1) * (MetaLearn: true) * (TeacherExplainer: softmax_param) * (StudentExplainer: softmax_param) * (MetaLR: 1e2 1e3) * (MetaInterval: 25 50)
-    #reach AverageResults via (NumExamples: 500 1000 2000) * (KLDCoeff: 1) * (MetaLearn: true) * (TeacherExplainer: softmax_param) * (StudentExplainer: softmax_param) * (MetaLR: 1e3 1e4) * (MetaInterval: 1 5 10)
-    #reach AverageResults via (NumExamples: 500 1000 2000) * (KLDCoeff: 1) * (MetaLearn: true) * (TeacherExplainer: entmax_param) * (StudentExplainer: entmax_param) * (MetaLR: 1e2 1e3) * (MetaInterval: 50)
-}
 
-plan ExplorePivot {
-    reach AverageResults via (NumExamples: 500 1000 2000) * (KLDCoeff: 1) * (MetaLearn: true) * (TeacherExplainer: softmax_param) * (StudentExplainer: softmax_param) * (MetaLR: 1e2 1e3) * (MetaInterval: *) * (MetaInit: uniform) * (Pivot: *)
-}
->>>>>>> 97ff60c7920c1eb4b4a3e1d174cc6d1a7e5da0fa
