@@ -1,48 +1,46 @@
 global {
-    ducttape_output="/projects/tir4/users/pfernand/workflows-outputs/meta-expl-experiments"
+    ducttape_output="/projects/tir4/users/pfernand/workflows-outputs/metaexpl-experiments/v1"
     ducttape_experimental_submitters=true
     ducttape_experimental_imports=true
     repo="/home/pfernand/repos/meta-expl"
-    seed=(
-      Seed:
-        0=0
-        1=1
-        2=2
-        3=3
-        4=4
-    )
+
     num_examples=(
         NumExamples:
             500=500
             1000=1000
             2000=2000
             4000=4000
-            8000=8000
-    )
-    kld_coeff=(
-        KLDCoeff:
-            0=0.
-            1=1.
-            5=5.
-    )
-    teacher_explainer=(
-        TeacherExplainer:
-            entmax="entmax15"
-            softmax="softmax"
-            topk="topk_softmax"
-            sparsemax="sparsemax"
-            softmax_param="softmax_param"
-            entmax_param="entmax15_param"
-    )
-    student_explainer=(
-        StudentExplainer:
-            entmax="entmax15"
-            softmax="softmax"
-            sparsemax="sparsemax"
-            softmax_param="softmax_param"
-            entmax_param="entmax15_param"
     )
 
+    # models and explainers parameters
+    teacher_arch=electra
+    student_arch=embedding
+
+    teacher_explainer=(
+        TeacherExplainer:
+            attention="attention_explainer"
+            hidden_qk="hidden_qk_explainer"
+            attention_query="attention_query_explainer"
+    )
+    student_explainer="attention_explainer"
+
+    # optimization paramaters
+    num_epochs=""
+    batch_size=16
+    lr=5e-4
+    kld_coeff=(
+        KLDCoeff: 
+            0=0
+            1=1
+    )
+    patience=(
+        NumExamples:
+            500=40
+            1000=30
+            2000=20
+    )
+
+    # (meta) optimization parameters
     metalearn=(
         MetaLearn:
             false=false
@@ -50,18 +48,27 @@ global {
     )
     meta_lr=(
         MetaLR:
-            1e4=1e-4
-            1e3=1e-3
             1e2=1e-2
+            1e3=1e-3
+            5e4=5e-4
+            1e4=1e-4
     )
     meta_interval=(
         MetaInterval:
-            10=10
             1=1
-            5=5
-            25=25
-            50=50
-            500=500
+            10=10
+            100=100
+            1000=1000
+    )
+    meta_explicit=false
+
+    seed=(
+        Seed: 
+            0=0
+            1=1
+            2=2
+            3=3
+            4=4
     )
 
     submitter=slurm
@@ -72,15 +79,9 @@ plan TrainTeacher {
 }
 
 plan TrainStudent {
-    #reach AverageResults via (NumExamples: 500 1000 2000 4000 8000) * (KLDCoeff: *) * (TeacherExplainer: softmax) * (StudentExplainer: softmax)
-    #reach AverageResults via (NumExamples: 500 1000 2000 4000 8000) * (KLDCoeff: *) * (TeacherExplainer: topk) * (StudentExplainer: softmax)
-    #reach AverageResults via (NumExamples: 500 1000 2000 4000 8000) * (KLDCoeff: *) * (TeacherExplainer: entmax) * (StudentExplainer: entmax)
-    #reach AverageResults via (NumExamples: 500 1000 2000 4000 8000) * (KLDCoeff: *) * (TeacherExplainer: sparsemax) * (StudentExplainer: sparsemax)
-    reach AverageResults via (NumExamples: 500 1000 2000) * (KLDCoeff: 0 1) * (TeacherExplainer: softmax_param) * (StudentExplainer: softmax_param)
+    reach AverageResults via (NumExamples: *) * (KLDCoeff: 0 1) * (TeacherExplainer: *)
 }
 
 plan MetaTrain {
-    reach AverageResults via (NumExamples: 500 1000 2000) * (KLDCoeff: 1) * (MetaLearn: true) * (TeacherExplainer: softmax_param) * (StudentExplainer: softmax_param) * (MetaLR: 1e2 1e3) * (MetaInterval: 25 50)
-    reach AverageResults via (NumExamples: 500 1000 2000) * (KLDCoeff: 1) * (MetaLearn: true) * (TeacherExplainer: softmax_param) * (StudentExplainer: softmax_param) * (MetaLR: 1e3 1e4) * (MetaInterval: 1 5 10)
-    #reach AverageResults via (NumExamples: 500 1000 2000) * (KLDCoeff: 1) * (MetaLearn: true) * (TeacherExplainer: entmax_param) * (StudentExplainer: entmax_param) * (MetaLR: 1e2 1e3) * (MetaInterval: 50)
+    reach AverageResults via (NumExamples: *) * (KLDCoeff: 1) * (MetaLearn: true) * (TeacherExplainer: *) * (MetaLR: 5e4) * (MetaInterval: *)
 }

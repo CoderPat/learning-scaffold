@@ -8,7 +8,7 @@ from transformers import PreTrainedTokenizerFast
 
 def load_data(
     dataset: str,
-    model: str,
+    setup: str,
     split: str,
     teacher_valid_size: int = 12500,
     student_valid_size: int = 1250,
@@ -24,7 +24,7 @@ def load_data(
 
     Args:
         dataset: tag to retrieve a HF dataset;
-        model: the model type (either teacher or student) to which we are retrieving the data
+        setup: TODO
         split: flag to return the train/validation/test set.
 
     Returns:
@@ -33,7 +33,7 @@ def load_data(
     """
 
     hf_dataset = load_dataset(dataset)
-    original_split = "train" if (model == "teacher" and split == "train") else "test"
+    original_split = "train" if (setup == "no_teacher" and split == "train") else "test"
     data = hf_dataset[original_split]
     data = list(data)
     rng = random.RandomState(seed)
@@ -41,14 +41,14 @@ def load_data(
 
     # We resplit data according to teacher/student dichotomy
     # note that the teacher doesn't have a test split
-    if model == "teacher":
+    if setup == "no_teacher":
         if split == "train":
             pass
         elif split == "valid":
             data = data[:teacher_valid_size]
         elif split == "test":
             raise ValueError("teacher model doesn't have a test split")
-    if model == "student":
+    else:
         dev_size = student_test_size + student_valid_size
         if split == "train":
             data = data[teacher_valid_size:-dev_size]
@@ -109,4 +109,4 @@ def dataloader(
             )
         )
         batch_outputs = jnp.stack(batch_outputs)
-        yield batch_inputs, batch_outputs, batch_idxs
+        yield batch_inputs, batch_outputs

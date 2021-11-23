@@ -24,31 +24,19 @@ def aprox_inverse_hvp(df, primals, cotangent, n_iters=3, lr=0.1):
             p = jax.tree_multimap(lambda v, p: v + p, v, p)
             return v, p
 
-        # v, p = jax.lax.fori_loop(0, n_iters, loop_body, (v, p))
-        v, p = debug_foriloop(0, n_iters, loop_body, (v, p))
+        v, p = jax.lax.fori_loop(0, n_iters, loop_body, (v, p))
+        # v, p = debug_foriloop(0, n_iters, loop_body, (v, p))
         return p
 
     return _aprox_inverse_hvp(df, primals, cotangent, n_iters, lr)
 
 
-def hypergrad(train_loss, valid_loss, params, metaparams):
+def hypergrad(train_loss, valid_loss, params, metaparams, lr=1e-4):
     """
     Assumes `train_loss(params, metaparams)` and `valid_loss(params)`
-    TODO: consider case where valid_loss also depends on hyperparams
     """
     v1 = jax.grad(valid_loss)(params)
     df = jax.grad(train_loss)
-    v2 = aprox_inverse_hvp(df, (params, metaparams), v1)
+    v2 = aprox_inverse_hvp(df, (params, metaparams), v1, lr=lr)
     v3 = jax.vjp(df, params, metaparams)[1](v2)[1]
-    return v3
-
-
-# TODO: Add tests
-"""
-v = jnp.array([1., 1.])
-x = jnp.array([1., 1.])
-y = 1.
-t_f = lambda x, y: x[0]**3 + x[1]**3 + (x[0]+x[1])*y**2
-v_f = lambda x: x[0]**3 + x[1]**3
-print(hypergrad(t_f, v_f, x, y))
-"""
+    return jax.tree_map(lambda g: -g, v3)

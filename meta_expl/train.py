@@ -1,7 +1,6 @@
 import argparse
 from functools import partial
 from itertools import cycle
-from operator import not_
 from typing import Dict
 
 import flax.linen as nn
@@ -13,69 +12,55 @@ import pkbar
 from transformers import ElectraTokenizerFast
 
 from meta_expl.data import dataloader, load_data
-from meta_expl.explainers import create_explainer, explanation_loss, save_explainer
+from meta_expl.explainers import EXPLAINER_REGISTRY, create_explainer, save_explainer
 from meta_expl.hypergrad import hypergrad
 from meta_expl.models import create_model, load_model, save_model
 from meta_expl.utils import PRNGSequence, adamw_with_clip, cross_entropy_loss
 
+LARGE_INT = 9223372036854775807
+
 
 def read_args():
     parser = argparse.ArgumentParser()
+    parser.add_argument("--seed", type=int, default=0)
+
     parser.add_argument(
-        "--model-type",
-        choices=["teacher", "student"],
-        default="teacher",
-        help="wether we are training a student or teacher model",
+        "--setup",
+        choices=["no_teacher", "static_teacher", "learnable_teacher"],
+        default="no_teacher",
+        help="TODO: proper documentation",
+    )
+
+    # Parameters defining "main model"
+    parser.add_argument(
+        "--arch", default="electra", choices=["electra", "lstm", "embedding"]
+    )
+    parser.add_argument(
+        "--explainer",
+        choices=EXPLAINER_REGISTRY.keys(),
+        default="softmax",
+    )
+
+    # Parameters defining teacher
+    parser.add_argument(
+        "--teacher-dir",
+        type=str,
+        default=None,
+        help="Directory of trained teacher model. "
+        "Needs to be and can only be set if `--setup` includes supervision",
     )
     parser.add_argument(
         "--teacher-explainer",
-        choices=[
-            "softmax",
-            "entmax15",
-            "sparsemax",
-            "topk_softmax",
-            "softmax_param",
-            "entmax15_param",
-            "softmax_param_full"
-        ],
-        default="softmax",
+        choices=EXPLAINER_REGISTRY.keys(),
+        default="attention_explainer",
     )
-    parser.add_argument(
-        "--student-explainer",
-        choices=["softmax", "entmax15", "sparsemax", "softmax_param", "entmax15_param", "softmax_param_full"],
-        default="softmax",
-    )
-    parser.add_argument("--arch", default="electra", choices=["electra"])
+
+    # Parameters defining data used
     parser.add_argument("--num-examples", type=int, default=None)
-    parser.add_argument("--kld-coeff", type=float, default=1.0, help="")
     parser.add_argument(
-        "--num-epochs", default=100, type=int, help="number of training epochs"
-    )
-    parser.add_argument(
-        "--patience", default=5, type=int, help="patience for early stopping"
-    )
-    parser.add_argument("--metalearn-interval", default=None, type=int, help="TODO")
-    parser.add_argument(
-        "--learning-rate",
-        default=5e-5,
-        type=float,
-        help="learning rate for the optimizer",
-    )
-    parser.add_argument("--meta-lr", default=1e-4, type=float)
-    parser.add_argument(
-        "--clip-grads",
-        default=1.0,
-        type=float,
-        help="Maximum gradient norm to clip gradients",
-    )
-    parser.add_argument(
-        "--batch-size", type=int, default=16, help="Batch size to use during training"
-    )
-    parser.add_argument(
-        "--meta-batch-size",
-        type=int,
-        default=16,
-        help="Batch size to use during meta-training",
+        "--tokenizer",
+        default="electra",
+        help="tokenizer to use. Currently the same tokenizer needs to be used for student and teacher model",
     )
     parser.add_argument(
         "--max-len",
@@ -83,19 +68,49 @@ def read_args():
         default=256,
         help="Max sequence size to consider. Sequences longer than this will be truncated",
     )
+
+    # Parameters defining optimization
+    # ===========
     parser.add_argument(
-        "--teacher-dir",
-        type=str,
+        "--num-epochs",
         default=None,
-        help="Directory of trained teacher model. "
-        "Needs to be and can only be set if model type is student",
+        type=int,
+        help="number of training epochs. if none will train until patience is reached",
+    )
+    parser.add_argument("--kld-coeff", type=float, default=1.0, help="")
+    parser.add_argument(
+        "--patience", default=5, type=int, help="patience for early stopping"
     )
     parser.add_argument(
-        "--teacher-explainer-dir",
-        type=str,
-        default=None,
-        help="Directory to save the trained teacher explainer. ",
+        "--learning-rate",
+        default=5e-5,
+        type=float,
+        help="learning rate for the optimizer",
     )
+    parser.add_argument(
+        "--batch-size", type=int, default=16, help="Batch size to use during training"
+    )
+    parser.add_argument(
+        "--clip-grads",
+        default=5.0,
+        type=float,
+        help="Maximum gradient norm to clip gradients",
+    )
+    # Parameters for meta-optimization
+    parser.add_argument(
+        "--meta-interval",
+        default=1,
+        type=int,
+        help="Number of inner optimization steps to perform before applying a optimization to the teacher",
+    )
+    parser.add_argument("--meta-lr", default=1e-3, type=float)
+    parser.add_argument(
+        "--meta-explicit",
+        action="store_true",
+        help="Weather to use explicit gradient computation in the meta optimization",
+    )
+
+    # Parameters for serialization
     parser.add_argument(
         "--model-dir",
         type=str,
@@ -109,24 +124,17 @@ def read_args():
         help="Directory to save the model",
     )
     parser.add_argument(
-<<<<<<< HEAD
-        "--meta-init", choices=["uniform", "random"], default="uniform"
-=======
-        "--pivot",
-        action="store_true",
-        help="Whether to use pivoting",
->>>>>>> 14a385b4d359663a8e13f2c640d4417126da2d7f
+        "--teacher-explainer-dir",
+        type=str,
+        default=None,
+        help="Directory to save the trained teacher explainer. ",
     )
-    parser.add_argument("--seed", type=int, default=0)
+
     args = parser.parse_args()
 
-    assert (args.model_type == "student") != (
+    assert (args.setup != "no_teacher") != (
         args.teacher_dir is None
     ), "teacher_dir needs to and can only be set if training a student model"
-
-    assert (
-        args.model_type == "student" or args.metalearn_interval is None
-    ), "metalearning can only be applied if training a student model"
 
     return args
 
@@ -141,15 +149,15 @@ def train_step(
     x: Dict["str", jnp.array],
     y: jnp.array,
 ):
-    """Train step"""
+    """Train step without supervision"""
 
     def loss_fn(params):
         logits = model.apply(params, **x, deterministic=False, rngs={"dropout": rng})[0]
         loss = cross_entropy_loss(logits, y)
-        return loss, logits
+        return loss
 
-    grad_fn = jax.value_and_grad(loss_fn, has_aux=True)
-    (loss, _), grads = grad_fn(params)
+    grad_fn = jax.value_and_grad(loss_fn)
+    loss, grads = grad_fn(params)
     updates, opt_state = update_fn(grads, opt_state, params)
     return loss, optax.apply_updates(params, updates), opt_state
 
@@ -173,47 +181,38 @@ def train_step_with_teacher(
 ):
     """Train step for a model trained with attention supervision by a teacher"""
     # compute teacher prediction and attention
-    t_logits, teacher_attn = teacher.apply(
-        teacher_params,
-        **x,
-        deterministic=True,
-        output_attentions=True,
-        unnorm_attention=True,
-    )
+    t_logits, teacher_attn = teacher.apply(teacher_params, **x, deterministic=True)
     y_teacher = jnp.argmax(t_logits, axis=-1)
-    teacher_expl, _ = teacher_explainer.apply(teacher_explainer_params, teacher_attn)
+    teacher_expl, _ = teacher_explainer.apply(teacher_explainer_params, x, teacher_attn)
 
     def loss_fn(params):
         student_params, student_explainer_params = params
 
         # compute student prediction and attention and loss
-        logits, student_attn = student.apply(
+        logits, student_state = student.apply(
             student_params,
             **x,
             deterministic=False,
-            output_attentions=True,
-            unnorm_attention=True,
             rngs={"dropout": rng},
         )
         main_loss = cross_entropy_loss(logits, y_teacher)
 
         # compute explanations based on attention for both teacher and student
         student_expl, s_extras = student_explainer.apply(
-            student_explainer_params, student_attn
+            student_explainer_params, x, student_state
         )
-        mean_teacher_expl_size = jnp.mean(teacher_expl > 0)
-        expl_loss = explanation_loss(
-            student_expl,
-            teacher_expl,
+        expl_loss = teacher_explainer.loss_fn(
             student_explainer=student_explainer,
             teacher_explainer=teacher_explainer,
-            **(s_extras if s_extras is not None else {}),
+            student_explanation=student_expl,
+            teacher_explanation=teacher_expl,
+            **s_extras,
         )
 
-        return main_loss + expl_coeff * expl_loss, (logits, mean_teacher_expl_size)
+        return main_loss + expl_coeff * expl_loss
 
-    grad_fn = jax.value_and_grad(loss_fn, has_aux=True)
-    (loss, (_, mtes)), grads = grad_fn((student_params, student_explainer_params))
+    grad_fn = jax.value_and_grad(loss_fn)
+    loss, grads = grad_fn((student_params, student_explainer_params))
     updates, opt_state = update_fn(
         grads, opt_state, (student_params, student_explainer_params)
     )
@@ -221,12 +220,12 @@ def train_step_with_teacher(
         loss,
         optax.apply_updates((student_params, student_explainer_params), updates),
         opt_state,
-        mtes,
     )
 
 
-@partial(jax.jit, static_argnums=(0, 1, 2, 3, 4))
+@partial(jax.jit, static_argnums=(0, 1, 2, 3, 4, 5))
 def metatrain_step(
+    explicit_optimization: bool,
     student: nn.Module,
     student_explainer: nn.Module,
     teacher: nn.Module,
@@ -243,14 +242,18 @@ def metatrain_step(
     valid_x: Dict["str", jnp.array],
     valid_y: jnp.array,
     expl_coeff: float,
+    inner_lr: float = 5e-5,
 ):
+    """
+    Performs an update on the teacher explainer
+
+    TODO: document parameters better
+    """
     # compute teacher prediction and attention
-    t_logits, teacher_attn = teacher.apply(
+    t_logits, teacher_state = teacher.apply(
         teacher_params,
         **train_x,
         deterministic=True,
-        output_attentions=True,
-        unnorm_attention=True,
     )
     y_teacher = jnp.argmax(t_logits, axis=-1)
 
@@ -259,30 +262,27 @@ def metatrain_step(
         teacher_explainer_params = metaparams
 
         # compute student prediction and attention and loss
-        logits, student_attn = student.apply(
+        logits, student_state = student.apply(
             student_params,
             **train_x,
             deterministic=False,
-            output_attentions=True,
-            unnorm_attention=True,
             rngs={"dropout": rng},
         )
         main_loss = cross_entropy_loss(logits, y_teacher)
 
         # compute explanations based on attention for both teacher and student
         student_expl, s_extras = student_explainer.apply(
-            student_explainer_params, student_attn
+            student_explainer_params, train_x, student_state
         )
         teacher_expl, _ = teacher_explainer.apply(
-            teacher_explainer_params, teacher_attn
+            teacher_explainer_params, train_x, teacher_state
         )
-        # mean_teacher_expl_size = jnp.sum(teacher_expl > 0)
-        expl_loss = explanation_loss(
-            student_expl,
-            teacher_expl,
+        expl_loss = teacher_explainer.loss_fn(
             student_explainer=student_explainer,
             teacher_explainer=teacher_explainer,
-            **(s_extras if s_extras is not None else {}),
+            student_explanation=student_expl,
+            teacher_explanation=teacher_expl,
+            **s_extras,
         )
 
         return main_loss + expl_coeff * expl_loss
@@ -292,8 +292,6 @@ def metatrain_step(
         teacher_params,
         **valid_x,
         deterministic=True,
-        output_attentions=True,
-        unnorm_attention=True,
     )
     v_y_teacher = jnp.argmax(v_t_logits, axis=-1)
 
@@ -301,21 +299,33 @@ def metatrain_step(
         student_params, _ = params
 
         # compute student prediction and attention and loss
-        logits, student_attn = student.apply(
+        logits, _ = student.apply(
             student_params,
             **valid_x,
             deterministic=True,
-            output_attentions=True,
-            unnorm_attention=True,
         )
         return cross_entropy_loss(logits, v_y_teacher)
 
-    metagrads = hypergrad(
-        train_loss_fn,
-        valid_loss_fn,
-        (student_params, student_explainer_params),
-        teacher_explainer_params,
-    )
+    if explicit_optimization:
+
+        def student_update_fn(params, metaparams):
+            grads = jax.grad(train_loss_fn)(params, metaparams)
+            inner_sgd_fn = lambda g, state: (state - inner_lr * g)
+            new_params = jax.tree_multimap(inner_sgd_fn, grads, params)
+            return valid_loss_fn(new_params)
+
+        metagrads = jax.grad(student_update_fn, argnums=1)(
+            (student_params, student_explainer_params), teacher_explainer_params
+        )
+    else:
+        metagrads = hypergrad(
+            train_loss_fn,
+            valid_loss_fn,
+            (student_params, student_explainer_params),
+            teacher_explainer_params,
+            lr=inner_lr,
+        )
+
     updates, metaopt_state = update_fn(
         metagrads, metaopt_state, teacher_explainer_params
     )
@@ -337,54 +347,67 @@ def main():
     keyseq = PRNGSequence(args.seed)
     np.random.seed(args.seed)
 
-    train_data = load_data("imdb", args.model_type, "train")
-    valid_data = load_data("imdb", args.model_type, "valid")
+    # Loads data and tokenizer
+    # TODO(CoderPat): add a larger dataset
+    train_data = load_data("imdb", args.setup, "train")
+    valid_data = load_data("imdb", args.setup, "valid")
     num_classes = 2  # TODO: remove hard-coding
 
     if args.num_examples is not None:
         train_data = train_data[: args.num_examples]
 
-    # load model and tokenizer
-    classifier, params, dummy_state = create_model(
-        next(keyseq), num_classes, args.arch, args.batch_size, args.max_len
-    )
-    explainer, explainer_params = create_explainer(
-        next(keyseq), dummy_state, explainer_type=args.student_explainer, meta_init=args.meta_init
-    )
-    if args.arch == "electra":
+    if args.tokenizer == "electra":
         tokenizer = ElectraTokenizerFast.from_pretrained(
             "google/electra-small-discriminator"
         )
-    elif args.arch == "bert":
-        raise ValueError("not implemented")
     else:
-        raise ValueError("unknown model type")
+        raise ValueError("unknown tokenizer type")
+
+    # load "main" model and its explainer
+    classifier, params, dummy_inputs, dummy_state = create_model(
+        key=next(keyseq),
+        num_classes=num_classes,
+        arch=args.arch,
+        batch_size=args.batch_size,
+        max_len=args.max_len,
+    )
+    explainer, explainer_params = create_explainer(
+        key=next(keyseq),
+        inputs=dummy_inputs,
+        state=dummy_state,
+        explainer_type=args.explainer,
+    )
 
     # load teacher model for training student
     if args.teacher_dir is not None:
         teacher, teacher_params, dummy_state = load_model(
-            args.teacher_dir, batch_size=args.batch_size, max_len=args.max_len
+            model_dir=args.teacher_dir, batch_size=args.batch_size, max_len=args.max_len
         )
         teacher_explainer, teacher_explainer_params = create_explainer(
-            next(keyseq), dummy_state, explainer_type=args.teacher_explainer, meta_init=args.meta_init,
+            key=next(keyseq),
+            inputs=dummy_inputs,
+            state=dummy_state,
+            explainer_type=args.teacher_explainer,
         )
 
     # load optimizer
+    # TODO: allow different optimizer
     optimizer = adamw_with_clip(args.learning_rate, max_norm=args.clip_grads)
-    # TODO: this is ugly
-    if args.model_type == "student":
-        opt_state = optimizer.init((params, explainer_params))
-    else:
-        opt_state = optimizer.init(params)
+    opt_state = optimizer.init(
+        (params, explainer_params) if args.setup != "no_teacher" else params
+    )
 
-    if args.metalearn_interval is not None:
+    if args.setup == "learnable_teacher":
         metaoptimizer = adamw_with_clip(args.meta_lr, max_norm=args.clip_grads)
         metaopt_state = metaoptimizer.init(teacher_explainer_params)
 
     # define evaluation loop
     def evaluate(data, params, simulability=False):
+        if simulability:
+            teacher_predict = jax.jit(lambda x: teacher.apply(teacher_params, **x)[0])
+
         total, total_correct, total_loss = 0, 0, 0
-        for x, y, _ in dataloader(
+        for x, y in dataloader(
             data,
             tokenizer,
             batch_size=args.batch_size,
@@ -392,7 +415,7 @@ def main():
             shuffle=False,
         ):
             if simulability:
-                y = jnp.argmax(teacher.apply(teacher_params, **x)[0], axis=-1)
+                y = jnp.argmax(teacher_predict(x), axis=-1)
 
             loss, acc = eval_step(classifier, params, x, y)
             total_loss += loss * y.shape[0]
@@ -400,15 +423,16 @@ def main():
             total += y.shape[0]
         return total_loss / total, total_correct / total
 
+    num_epochs = args.num_epochs if args.num_epochs is not None else LARGE_INT
+    inner_step = 0
     best_metric = 0
-    best_params = params
-    for epoch in range(args.num_epochs):
-        if args.metalearn_interval is not None:
+    for epoch in range(num_epochs):
+        if args.setup == "learnable_teacher":
             valid_dataloader = cycle(
                 dataloader(
                     valid_data,
                     tokenizer,
-                    batch_size=args.meta_batch_size,
+                    batch_size=args.batch_size,
                     max_len=args.max_len,
                     shuffle=True,
                 )
@@ -417,36 +441,26 @@ def main():
         bar = pkbar.Kbar(
             target=len(train_data) + 1,
             epoch=epoch,
-            num_epochs=args.num_epochs,
+            num_epochs=args.num_epochs if args.num_epochs is not None else -1,
             width=10,
         )
         seen_samples = 0
-        seen_idxs = []
-        total_mtes = 0
-        for step, (x, y, idxs) in enumerate(
-            dataloader(
-                train_data,
-                tokenizer,
-                batch_size=args.batch_size,
-                max_len=args.max_len,
-                shuffle=True,
-            ),
-            1,
+        for x, y in dataloader(
+            train_data,
+            tokenizer,
+            batch_size=args.batch_size,
+            max_len=args.max_len,
+            shuffle=True,
         ):
-            if args.model_type == "teacher":
+            if args.setup == "no_teacher":
                 loss, params, opt_state = train_step(
                     classifier, optimizer.update, params, opt_state, next(keyseq), x, y
                 )
-                mtes = 0
             else:
-                if args.pivot:
-                    copied_params = params
-                    copied_explainer_params = explainer_params
                 (
                     loss,
                     (params, explainer_params),
                     opt_state,
-                    mtes,
                 ) = train_step_with_teacher(
                     classifier,
                     explainer,
@@ -464,18 +478,17 @@ def main():
                     args.kld_coeff,
                 )
 
-            total_mtes += mtes
-            seen_idxs.extend(idxs)
-
             seen_samples += y.shape[0]
             bar.update(seen_samples, values=[("train_loss", loss)])
-
+            inner_step += 1
             if (
-                args.metalearn_interval is not None
-                and step % args.metalearn_interval == 0
+                args.setup == "learnable_teacher"
+                and inner_step % args.meta_interval == 0
             ):
+                inner_step = 0
                 valid_x, valid_y = next(valid_dataloader)
                 teacher_explainer_params, metaopt_state = metatrain_step(
+                    args.meta_explicit,
                     classifier,
                     explainer,
                     teacher,
@@ -492,54 +505,28 @@ def main():
                     valid_x,
                     valid_y,
                     args.kld_coeff,
+                    inner_lr=args.learning_rate,
                 )
-                if args.pivot:
-                    for x_, y_, _ in dataloader(
-                        train_data,
-                        tokenizer,
-                        batch_size=args.batch_size,
-                        max_len=args.max_len,
-                        shuffle=True,
-                        idxs=seen_idxs,
-                    ):
-                        (
-                            loss,
-                            (params, explainer_params),
-                            opt_state,
-                            mtes,
-                        ) = train_step_with_teacher(
-                            classifier,
-                            explainer,
-                            teacher,
-                            teacher_explainer,
-                            optimizer.update,
-                            copied_params,
-                            copied_explainer_params,
-                            teacher_params,
-                            teacher_explainer_params,
-                            opt_state,
-                            next(keyseq),
-                            x_,
-                            y_,
-                            args.kld_coeff,
-                        )
 
         valid_loss, valid_metric = evaluate(
-            valid_data, params, simulability=args.model_type == "student"
+            valid_data, params, simulability=(args.setup != "no_teacher")
         )
         if valid_metric > best_metric:
             best_metric = valid_metric
             best_params = params
             if args.model_dir is not None:
                 save_model(args.model_dir, classifier, params)
-            if args.explainer_dir is not None:
+
+            if args.setup != "no_teacher" and args.explainer_dir is not None:
                 save_explainer(args.explainer_dir, explainer, explainer_params)
-            if args.teacher_explainer_dir is not None:
+
+            if args.setup != "no_teacher" and args.teacher_explainer_dir is not None:
                 save_explainer(
                     args.teacher_explainer_dir,
                     teacher_explainer,
                     teacher_explainer_params,
                 )
+
             not_improved = 0
         else:
             not_improved += 1
@@ -549,18 +536,18 @@ def main():
             values=[
                 ("valid_loss", valid_loss),
                 (
-                    f"valid_{'sim' if args.model_type=='student' else 'acc'}",
+                    f"valid_{'sim' if args.setup!='no_teacher' else 'acc'}",
                     valid_metric,
                 ),
-                ("train_mtes", total_mtes / seen_samples),
             ],
         )
 
         if not_improved > args.patience:
             break
 
-    if args.model_type == "student":
-        test_data = load_data("imdb", "student", "test")
+    # TODO: make this more general
+    if args.setup != "no_teacher":
+        test_data = load_data("imdb", args.setup, "test")
         _, test_acc = evaluate(test_data, best_params)
         _, test_sim = evaluate(test_data, best_params, simulability=True)
         print(f"Test Accuracy: {test_acc:.04f}; Test Simulability: {test_sim:.04f}")
