@@ -310,8 +310,9 @@ def metatrain_step(
 
         def student_update_fn(params, metaparams):
             grads = jax.grad(train_loss_fn)(params, metaparams)
-            inner_sgd_fn = lambda g, state: (state - inner_lr * g)
-            new_params = jax.tree_multimap(inner_sgd_fn, grads, params)
+            new_params = jax.tree_multimap(
+                lambda g, state: (state - inner_lr * g), grads, params
+            )
             return valid_loss_fn(new_params)
 
         metagrads = jax.grad(student_update_fn, argnums=1)(

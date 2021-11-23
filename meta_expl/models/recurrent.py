@@ -1,8 +1,6 @@
-
 import flax.linen as nn
 import jax
 import jax.numpy as jnp
-
 
 
 class EncoderBlock(nn.Module):

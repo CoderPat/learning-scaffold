@@ -1,8 +1,6 @@
-
 import flax.linen as nn
 import jax.numpy as jnp
 from transformers.models.bert.modeling_flax_bert import FlaxBertModule
-
 
 
 class BertClassifier(nn.Module):

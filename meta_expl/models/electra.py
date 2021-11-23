@@ -1,11 +1,9 @@
-
 import flax.linen as nn
 import jax.numpy as jnp
 from transformers import ElectraConfig
 from transformers.models.electra.modeling_flax_electra import (
     FlaxElectraForSequenceClassificationModule,
 )
-
 
 
 class ElectraClassifier(nn.Module):
