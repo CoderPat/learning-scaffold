@@ -1,7 +1,11 @@
 jax
 jaxlib
 datasets
+optax
+pkbar
 
 # Flax and Transfomers Fork
-git+git://github.com/CoderPat/transformers.git@master#egg=transformers
-git+git://github.com/CoderPat/flax.git@master#egg=flax
+git+git://github.com/CoderPat/transformers.git@unnormalized-attention#egg=transformers
+git+git://github.com/CoderPat/flax.git@custom-attention#egg=flax
+# git+git://github.com/deep-spin/entmax-jax.git@master#egg=entmax-jax
+git+git://github.com/deep-spin/entmax-jax.git@add-losses#egg=entmax-jax
