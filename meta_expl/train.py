@@ -2,6 +2,7 @@ import argparse
 from functools import partial
 from itertools import cycle
 from typing import Dict
+import json
 
 import flax.linen as nn
 import jax
@@ -38,7 +39,12 @@ def read_args():
     parser.add_argument(
         "--explainer",
         choices=EXPLAINER_REGISTRY.keys(),
-        default="softmax",
+        default="attention_explainer",
+    )
+    parser.add_argument(
+        "--explainer-params",
+        default="{}",
+        type=lambda s: json.loads(s),
     )
 
     # Parameters defining teacher
@@ -53,6 +59,11 @@ def read_args():
         "--teacher-explainer",
         choices=EXPLAINER_REGISTRY.keys(),
         default="attention_explainer",
+    )
+    parser.add_argument(
+        "--teacher-explainer-params",
+        default="{}",
+        type=lambda s: json.loads(s),
     )
 
     # Parameters defining data used
@@ -208,6 +219,9 @@ def train_step_with_teacher(
             teacher_explanation=teacher_expl,
             **s_extras,
         )
+        # print(s_extras)
+        # print(student_expl, teacher_expl)
+        # print(expl_loss)
 
         return main_loss + expl_coeff * expl_loss
 
@@ -377,6 +391,7 @@ def main():
         inputs=dummy_inputs,
         state=dummy_state,
         explainer_type=args.explainer,
+        explainer_args=args.explainer_params,
     )
 
     # load teacher model for training student
@@ -389,6 +404,7 @@ def main():
             inputs=dummy_inputs,
             state=dummy_state,
             explainer_type=args.teacher_explainer,
+            explainer_args=args.teacher_explainer_params,
         )
 
     # load optimizer

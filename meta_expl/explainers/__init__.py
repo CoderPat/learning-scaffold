@@ -70,11 +70,10 @@ def create_explainer(
     key: jax.random.PRNGKey,
     inputs: Any,
     state: Dict,
-    explainer_type: str = "softmax",
-    explainer_args: Dict = None,
+    explainer_type: str,
+    explainer_args: Dict = {},
 ):
     """Creates an explainer"""
-    explainer_args = {} if explainer_args is None else explainer_args
     explainer = EXPLAINER_REGISTRY[explainer_type](**explainer_args)
     # instantiate model parameters
     params = explainer.init(key, inputs, state)
@@ -106,7 +105,7 @@ def save_explainer(
         json.dump(config, f)
 
 
-def load_explainer(explainer_dir: str, state, suffix: str = "best"):
+def load_explainer(explainer_dir: str, inputs: Any, state: Dict, suffix: str = "best"):
     """
     Loads a serialized explainer
     """
@@ -114,13 +113,13 @@ def load_explainer(explainer_dir: str, state, suffix: str = "best"):
     with open(os.path.join(explainer_dir, "config.json")) as f:
         config = json.load(f)
 
-    explainer_type = config["explainer_args"]
+    explainer_type = config["explainer_type"]
     explainer_cls = EXPLAINER_REGISTRY[explainer_type]
     explainer = explainer_cls(**config["explainer_args"])
 
     # intialized random parameters
     key = jax.random.PRNGKey(0)
-    params = explainer.init(key, state)
+    params = explainer.init(key, inputs, state)
 
     # replace params with saved params
     with open(os.path.join(explainer_dir, f"model_{suffix}.ckpt"), "rb") as f:
@@ -171,8 +170,8 @@ class SaliencyExplainer(Explainer, metaclass=ABCMeta):
             return sparsemax_loss(student_explanation, teacher_explanation)
 
         if (
-            student_explainer.normalizer_fn == "entmax15"
-            and teacher_explainer.normalizer_fn == "entmax15"
+            student_explainer.normalizer_fn == "entmax"
+            and teacher_explainer.normalizer_fn == "entmax"
         ):
             return entmax_loss(
                 student_explanation, teacher_explanation, alpha=1.5, **extras

@@ -19,6 +19,7 @@ task TrainStudent
     :: repo=@
     :: teacher_explainer=@
     :: student_explainer=@
+    :: normalizer_fn=@
     :: num_epochs=@
     :: lr=@
     :: batch_size=@
@@ -31,13 +32,16 @@ task TrainStudent
     :: meta_explicit=@
     :: seed=@
 {
+    explainer_args="{\"normalizer_fn\": \"$normalizer_fn\"}"
     # TODO: add back number of epochs
     python $repo/meta_expl/train.py \
       --setup $([ "$metalearn" = true ] && echo "learnable_teacher" || echo "static_teacher") \
       --arch embedding \
       --explainer $student_explainer \
+      --explainer-params "$explainer_args" \
       --teacher-dir $teacher_dir \
       --teacher-explainer $teacher_explainer \
+      --teacher-explainer-params "$explainer_args" \
       --patience $patience \
       --learning-rate $lr \
       --num-examples $num_examples  \
