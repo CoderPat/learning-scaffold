@@ -1,16 +1,16 @@
 import flax.linen as nn
 import jax.numpy as jnp
-from transformers import ElectraConfig
-from transformers.models.electra.modeling_flax_electra import (
-    FlaxElectraForSequenceClassificationModule,
+from transformers import RobertaConfig
+from transformers.models.roberta.modeling_flax_roberta import (
+    FlaxRobertaForSequenceClassificationModule,
 )
 
 
-class ElectraModel(nn.Module):
-    """A Electra-based classification module"""
+class RobertaModel(nn.Module):
+    """A Roberta-based classification module"""
 
     num_labels: int
-    config: ElectraConfig
+    config: RobertaConfig
 
     @nn.compact
     def __call__(
@@ -21,7 +21,6 @@ class ElectraModel(nn.Module):
         position_ids=None,
         deterministic: bool = True,
     ):
-
         if token_type_ids is None:
             token_type_ids = jnp.ones_like(input_ids)
         if position_ids is None:
@@ -29,8 +28,8 @@ class ElectraModel(nn.Module):
         if attention_mask is None:
             attention_mask = jnp.ones_like(input_ids)
 
-        electra_module = FlaxElectraForSequenceClassificationModule(config=self.config)
-        outputs, hidden_states, attentions = electra_module(
+        roberta_module = FlaxRobertaForSequenceClassificationModule(config=self.config)
+        outputs, hidden_states, attentions = roberta_module(
             input_ids,
             attention_mask=attention_mask,
             token_type_ids=token_type_ids,

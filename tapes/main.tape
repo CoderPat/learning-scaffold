@@ -2,10 +2,15 @@ import "submitters.tape"
 
 task TrainTeacher 
     > teacher_dir
-    :: .submitter=@ .mem=16000 .gres="gpu:1" .cpus=2 .time=0
+    :: .submitter=@ .mem=16000 .gres="gpu:v100:1" .cpus=2 .time=0
     :: repo=@
+    :: task=@
+    :: teacher_arch=@
 {
     python $repo/meta_expl/train.py \
+      --task $task \
+      --arch $teacher_arch \
+      --tokenizer $teacher_arch \
       --model-dir $teacher_dir
 }
 
@@ -17,6 +22,9 @@ task TrainStudent
     > results
     :: .submitter=@ .mem=16000 .gres="gpu:1" .cpus=2 .time=0
     :: repo=@
+    :: task=@
+    :: teacher_arch=@
+    :: student_arch=@
     :: teacher_explainer=@
     :: student_explainer=@
     :: normalizer_fn=@
@@ -35,8 +43,10 @@ task TrainStudent
     explainer_args="{\"normalizer_fn\": \"$normalizer_fn\"}"
     # TODO: add back number of epochs
     python $repo/meta_expl/train.py \
+      --task $task \
       --setup $([ "$metalearn" = true ] && echo "learnable_teacher" || echo "static_teacher") \
-      --arch embedding \
+      --arch $student_arch \
+      --tokenizer $teacher_arch \
       --explainer $student_explainer \
       --explainer-params "$explainer_args" \
       --teacher-dir $teacher_dir \
@@ -44,7 +54,7 @@ task TrainStudent
       --teacher-explainer-params "$explainer_args" \
       --patience $patience \
       --learning-rate $lr \
-      --num-examples $num_examples  \
+      $([ ! -z "$num_examples"  ] && echo "--num-examples $num_examples" || echo "") \
       --kld-coeff $kld_coeff \
       --meta-interval $meta_interval \
       --meta-lr $meta_lr \

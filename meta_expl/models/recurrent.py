@@ -14,7 +14,7 @@ class EncoderBlock(nn.Module):
         return (c, h), output
 
 
-class BiLSTMClassifier(nn.Module):
+class BiLSTMModel(nn.Module):
     """
     A simple BiLstm+attention classification module.
     Note that the attention is applied *post-hoc* to the LSTM

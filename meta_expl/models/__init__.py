@@ -6,19 +6,30 @@ import flax
 import flax.linen as nn
 import jax
 import jax.numpy as jnp
-from transformers import FlaxElectraForSequenceClassification
+from transformers import (
+    FlaxElectraForSequenceClassification,
+    FlaxBertForSequenceClassification,
+    FlaxDistilBertForSequenceClassification,
+)
+from transformers.models.roberta.modeling_flax_roberta import (
+    FlaxRobertaForSequenceClassification,
+)
 
 from meta_expl.utils import is_jsonable
 
-from .electra import ElectraClassifier
-from .embedding import EmbedAttentionClassifier
-from .recurrent import BiLSTMClassifier
+from .bert import BertModel
+from .distilbert import DistilBertModel
+from .electra import ElectraModel
+from .roberta import RobertaModel
+from .embedding import EmbedAttentionModel
+from .recurrent import BiLSTMModel
 
 # TODO: major refactor of this
 
 
 def create_model(
     key: jax.random.PRNGKey,
+    vocab_size: int,
     num_classes: int,
     arch: str = "bert",
     batch_size: int = 16,
@@ -33,14 +44,78 @@ def create_model(
         "position_ids": jnp.ones_like(input_ids),
     }
 
-    if arch == "bert":
-        raise ValueError("not implemented")
+    if arch == "mbert":
+        # load pretrained model and create module based on its parameters
+        model = FlaxBertForSequenceClassification.from_pretrained(
+            "bert-base-multilingual-cased",
+            num_labels=num_classes,
+            from_pt=arch == "rembert",
+        )
+
+        assert vocab_size == model.config.vocab_size
+        classifier = BertModel(
+            num_labels=num_classes,
+            config=model.config,
+        )
+        params = classifier.init(key, **dummy_inputs)
+
+        # replace original parameters with pretrained parameters
+        params = params.unfreeze()
+
+        assert "FlaxBertForSequenceClassificationModule_0" in params["params"]
+        params["params"]["FlaxBertForSequenceClassificationModule_0"] = model.params
+        params = flax.core.freeze(params)
+
+    elif arch == "mbert-distill":
+        # load pretrained model and create module based on its parameters
+        model = FlaxDistilBertForSequenceClassification.from_pretrained(
+            "distilbert-base-multilingual-cased",
+            num_labels=num_classes,
+            from_pt=True,
+        )
+
+        assert vocab_size == model.config.vocab_size
+        classifier = DistilBertModel(num_labels=num_classes, config=model.config)
+        params = classifier.init(key, **dummy_inputs)
+
+        # replace original parameters with pretrained parameters
+        params = params.unfreeze()
+
+        assert "FlaxDistilBertForSequenceClassificationModule_0" in params["params"]
+        params["params"][
+            "FlaxDistilBertForSequenceClassificationModule_0"
+        ] = model.params
+        params = flax.core.freeze(params)
+
+    elif arch == "xlm-r" or arch == "xlm-r-large":
+        model = FlaxRobertaForSequenceClassification.from_pretrained(
+            "xlm-roberta-base" if arch == "xlm-r" else "xlm-roberta-large",
+            num_labels=num_classes,
+            from_pt=True,
+        )
+        assert vocab_size == model.config.vocab_size
+        classifier = RobertaModel(
+            num_labels=num_classes,
+            config=model.config,
+        )
+        params = classifier.init(key, **dummy_inputs)
+
+        # replace original parameters with pretrained parameters
+        params = params.unfreeze()
+
+        assert "FlaxRobertaForSequenceClassificationModule_0" in params["params"]
+        params["params"]["FlaxRobertaForSequenceClassificationModule_0"] = model.params
+        params = flax.core.freeze(params)
+
     elif arch == "electra":
         # load pretrained model and create module based on its parameters
         model = FlaxElectraForSequenceClassification.from_pretrained(
-            "google/electra-small-discriminator"
+            "google/electra-small-discriminator",
+            num_labels=num_classes,
         )
-        classifier = ElectraClassifier(
+
+        assert vocab_size == model.config.vocab_size
+        classifier = ElectraModel(
             num_labels=num_classes,
             vocab_size=model.config.vocab_size,
             embedding_size=model.config.embedding_size,
@@ -63,10 +138,7 @@ def create_model(
         params = flax.core.freeze(params)
 
     elif arch == "lstm":
-        # hard-coded vocab size to avoid loading extra copy of ELECTRA
-        vocab_size = 30522
-
-        classifier = BiLSTMClassifier(
+        classifier = BiLSTMModel(
             num_classes=num_classes,
             vocab_size=vocab_size,
         )
@@ -75,10 +147,7 @@ def create_model(
         params = classifier.init(key, **dummy_inputs)
 
     elif arch == "embedding":
-        # hard-coded vocab size to avoid loading extra copy of ELECTRA
-        vocab_size = 30522
-
-        classifier = EmbedAttentionClassifier(
+        classifier = EmbedAttentionModel(
             num_classes=num_classes,
             vocab_size=vocab_size,
         )
@@ -111,9 +180,27 @@ def save_model(
     # save model + config
     with open(os.path.join(model_dir, f"model_{suffix}.ckpt"), "wb") as f:
         f.write(flax.serialization.to_bytes(params))
+
     with open(os.path.join(model_dir, "config.json"), "w") as f:
-        serializable_args = {k: v for k, v in model.__dict__.items() if is_jsonable(v)}
-        json.dump(serializable_args, f)
+        config = {}
+        config["model_args"] = {
+            k: v for k, v in model.__dict__.items() if is_jsonable(v)
+        }
+        if model.__class__ == BertModel:
+            config["model_type"] = "bert"
+        elif model.__class__ == DistilBertModel:
+            config["model_type"] = "distilbert"
+        elif model.__class__ == ElectraModel:
+            config["model_type"] = "electra"
+        elif model.__class__ == RobertaModel:
+            config["model_type"] = "roberta"
+        elif model.__class__ == EmbedAttentionModel:
+            config["model_type"] = "embed"
+        elif model.__class__ == BiLSTMModel:
+            config["model_type"] = "recurrent"
+        else:
+            raise ValueError("unknown model type")
+        json.dump(config, f)
 
 
 def load_model(
@@ -128,9 +215,18 @@ def load_model(
     TODO(CoderPat): fix this to accept models other than electra
     """
     with open(os.path.join(model_dir, "config.json")) as f:
-        args = json.load(f)
+        config = json.load(f)
 
-    classifier = ElectraClassifier(**args)
+    if config["model_type"] == "bert":
+        classifier = BertModel(**config["model_args"])
+    elif config["model_type"] == "electra":
+        classifier = ElectraModel(**config["model_args"])
+    elif config["model_type"] == "embed":
+        classifier = EmbedAttentionModel(**config["model_args"])
+    elif config["model_type"] == "recurrent":
+        classifier = BiLSTMModel(**config["model_args"])
+    else:
+        raise ValueError("unknown model type")
 
     # instantiate (dummy) model parameters
     key = jax.random.PRNGKey(0)

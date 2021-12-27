@@ -3,7 +3,7 @@ import jax
 import jax.numpy as jnp
 
 
-class EmbedAttentionClassifier(nn.Module):
+class EmbedAttentionModel(nn.Module):
     """A simple embeddings+attention classification module"""
 
     num_classes: int

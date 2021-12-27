@@ -10,8 +10,9 @@ from optax import (
     additive_weight_decay,
     chain,
     clip_by_global_norm,
-    scale,
+    scale_by_schedule,
     scale_by_adam,
+    warmup_exponential_decay_schedule,
 )
 
 
@@ -26,20 +27,65 @@ def cross_entropy_loss(logits, targets):
     return loss.mean()
 
 
+def mse_loss(outputs, targets):
+    if outputs.ndim != targets.ndim:
+        raise ValueError(
+            "Incorrect shapes. Got shape %s outputs and %s targets"
+            % (str(outputs.shape), str(targets.shape))
+        )
+    loss = jnp.sum((outputs - targets) ** 2, axis=-1)
+    return loss.mean()
+
+
+def accuracy(outputs, targets):
+    if outputs.ndim + 1 != targets.ndim:
+        raise ValueError(
+            "Incorrect shapes. Got shape %s outputs and %s targets"
+            % (str(outputs.shape), str(targets.shape))
+        )
+    return jnp.mean(jnp.argmax(outputs, axis=-1) == targets)
+
+
+def pearson(outputs, targets):
+    if outputs.ndim != targets.ndim:
+        raise ValueError(
+            "Incorrect shapes. Got shape %s outputs and %s targets"
+            % (str(outputs.shape), str(targets.shape))
+        )
+    return jnp.corrcoef(outputs.reshape(-1), targets.reshape(-1))[0, 1]
+
+
+def neg_rmse(outputs, targets):
+    if outputs.ndim != targets.ndim:
+        raise ValueError(
+            "Incorrect shapes. Got shape %s outputs and %s targets"
+            % (str(outputs.shape), str(targets.shape))
+        )
+    return -jnp.sqrt(jnp.mean((outputs - targets) ** 2))
+
+
 def adamw_with_clip(
     learning_rate: float,
+    warmup_steps: int = 1000,
     b1: float = 0.9,
     b2: float = 0.999,
     eps: float = 1e-8,
     eps_root: float = 0.0,
-    weight_decay: float = 1e-4,
+    weight_decay: float = 1e-6,
     max_norm: float = 1.0,
 ) -> GradientTransformation:
+    schedule_fn = warmup_exponential_decay_schedule(
+        init_value=-1e-6,
+        peak_value=-learning_rate,
+        warmup_steps=warmup_steps,
+        transition_steps=0,
+        decay_rate=0,
+    )
     return chain(
         clip_by_global_norm(max_norm),
         scale_by_adam(b1=b1, b2=b2, eps=eps, eps_root=eps_root),
         additive_weight_decay(weight_decay),
-        scale(-learning_rate),
+        scale_by_schedule(schedule_fn),
     )
 
 

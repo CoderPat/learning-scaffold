@@ -10,13 +10,25 @@ import jax.numpy as jnp
 import numpy as np
 import optax
 import pkbar
-from transformers import ElectraTokenizerFast
+from transformers import (
+    ElectraTokenizerFast,
+    BertTokenizerFast,
+    DistilBertTokenizerFast,
+    XLMRobertaTokenizerFast,
+)
 
-from meta_expl.data import dataloader, load_data
 from meta_expl.explainers import EXPLAINER_REGISTRY, create_explainer, save_explainer
 from meta_expl.hypergrad import hypergrad
 from meta_expl.models import create_model, load_model, save_model
-from meta_expl.utils import PRNGSequence, adamw_with_clip, cross_entropy_loss
+from meta_expl.utils import (
+    PRNGSequence,
+    adamw_with_clip,
+    cross_entropy_loss,
+    mse_loss,
+    accuracy,
+    neg_rmse,
+    pearson,
+)
 
 LARGE_INT = 9223372036854775807
 
@@ -31,10 +43,21 @@ def read_args():
         default="no_teacher",
         help="TODO: proper documentation",
     )
+    parser.add_argument("--task", default="imdb", choices=["imdb", "mlqe"])
 
     # Parameters defining "main model"
     parser.add_argument(
-        "--arch", default="electra", choices=["electra", "lstm", "embedding"]
+        "--arch",
+        default="electra",
+        choices=[
+            "electra",
+            "xlm-r",
+            "xlm-r-large",
+            "mbert",
+            "mbert-distill",
+            "lstm",
+            "embedding",
+        ],
     )
     parser.add_argument(
         "--explainer",
@@ -150,9 +173,10 @@ def read_args():
     return args
 
 
-@partial(jax.jit, static_argnums=(0, 1))
+@partial(jax.jit, static_argnums=(0, 1, 2))
 def train_step(
     model: nn.Module,
+    criterion,
     update_fn,
     params,
     opt_state,
@@ -163,8 +187,10 @@ def train_step(
     """Train step without supervision"""
 
     def loss_fn(params):
-        logits = model.apply(params, **x, deterministic=False, rngs={"dropout": rng})[0]
-        loss = cross_entropy_loss(logits, y)
+        outputs = model.apply(params, **x, deterministic=False, rngs={"dropout": rng})[
+            0
+        ]
+        loss = criterion(outputs, y)
         return loss
 
     grad_fn = jax.value_and_grad(loss_fn)
@@ -173,12 +199,13 @@ def train_step(
     return loss, optax.apply_updates(params, updates), opt_state
 
 
-@partial(jax.jit, static_argnums=(0, 1, 2, 3, 4))
+@partial(jax.jit, static_argnums=(0, 1, 2, 3, 4, 5))
 def train_step_with_teacher(
     student: nn.Module,
     student_explainer: nn.Module,
     teacher: nn.Module,
     teacher_explainer: nn.Module,
+    criterion,
     update_fn,
     student_params,
     student_explainer_params,
@@ -200,13 +227,13 @@ def train_step_with_teacher(
         student_params, student_explainer_params = params
 
         # compute student prediction and attention and loss
-        logits, student_state = student.apply(
+        outputs, student_state = student.apply(
             student_params,
             **x,
             deterministic=False,
             rngs={"dropout": rng},
         )
-        main_loss = cross_entropy_loss(logits, y_teacher)
+        main_loss = criterion(outputs, y_teacher)
 
         # compute explanations based on attention for both teacher and student
         student_expl, s_extras = student_explainer.apply(
@@ -219,9 +246,6 @@ def train_step_with_teacher(
             teacher_explanation=teacher_expl,
             **s_extras,
         )
-        # print(s_extras)
-        # print(student_expl, teacher_expl)
-        # print(expl_loss)
 
         return main_loss + expl_coeff * expl_loss
 
@@ -237,13 +261,14 @@ def train_step_with_teacher(
     )
 
 
-@partial(jax.jit, static_argnums=(0, 1, 2, 3, 4, 5))
+@partial(jax.jit, static_argnums=(0, 1, 2, 3, 4, 5, 6))
 def metatrain_step(
     explicit_optimization: bool,
     student: nn.Module,
     student_explainer: nn.Module,
     teacher: nn.Module,
     teacher_explainer: nn.Module,
+    criterion,
     update_fn,
     student_params,
     student_explainer_params,
@@ -276,13 +301,13 @@ def metatrain_step(
         teacher_explainer_params = metaparams
 
         # compute student prediction and attention and loss
-        logits, student_state = student.apply(
+        outputs, student_state = student.apply(
             student_params,
             **train_x,
             deterministic=False,
             rngs={"dropout": rng},
         )
-        main_loss = cross_entropy_loss(logits, y_teacher)
+        main_loss = criterion(outputs, y_teacher)
 
         # compute explanations based on attention for both teacher and student
         student_expl, s_extras = student_explainer.apply(
@@ -347,13 +372,12 @@ def metatrain_step(
     return optax.apply_updates(teacher_explainer_params, updates), metaopt_state
 
 
-@partial(jax.jit, static_argnums=(0,))
-def eval_step(model, params, x, y):
+@partial(jax.jit, static_argnums=(0, 1))
+def eval_step(model, criterion, params, x, y):
     """Evaluation step"""
-    logits = model.apply(params, **x)[0]
-    loss = cross_entropy_loss(logits, y)
-    acc = jnp.mean(jnp.argmax(logits, axis=-1) == y)
-    return loss, acc
+    outputs = model.apply(params, **x)[0]
+    loss = criterion(outputs, y)
+    return loss, outputs
 
 
 def main():
@@ -362,11 +386,27 @@ def main():
     keyseq = PRNGSequence(args.seed)
     np.random.seed(args.seed)
 
-    # Loads data and tokenizer
-    # TODO(CoderPat): add a larger dataset
-    train_data = load_data("imdb", args.setup, "train")
-    valid_data = load_data("imdb", args.setup, "valid")
-    num_classes = 2  # TODO: remove hard-coding
+    # load task specific data loaders and set variables
+    if args.task == "imdb":
+        from meta_expl.data.imdb import dataloader, load_data
+
+        train_data = load_data(args.setup, "train")
+        valid_data = load_data(args.setup, "valid")
+        num_classes = 2  # TODO: remove hard-coding
+        task_type = "classification"
+        criterion = cross_entropy_loss
+        metrics = [accuracy]
+    elif args.task == "mlqe":
+        from meta_expl.data.mlqe import dataloader, load_data
+
+        train_data = load_data(args.setup, "train")
+        valid_data = load_data(args.setup, "valid")
+        num_classes = 1
+        task_type = "regression"
+        criterion = mse_loss
+        metrics = [pearson, neg_rmse]
+    else:
+        raise ValueError(f"Unknown task {args.task}")
 
     if args.num_examples is not None:
         train_data = train_data[: args.num_examples]
@@ -375,12 +415,23 @@ def main():
         tokenizer = ElectraTokenizerFast.from_pretrained(
             "google/electra-small-discriminator"
         )
+    elif args.tokenizer == "mbert":
+        tokenizer = BertTokenizerFast.from_pretrained("bert-base-multilingual-cased")
+    elif args.tokenizer == "mbert-distill":
+        tokenizer = DistilBertTokenizerFast.from_pretrained(
+            "distilbert-base-multilingual-cased"
+        )
+    elif args.tokenizer == "xlm-r":
+        tokenizer = XLMRobertaTokenizerFast.from_pretrained("xlm-roberta-base")
+    elif args.tokenizer == "xlm-r-large":
+        tokenizer = XLMRobertaTokenizerFast.from_pretrained("xlm-roberta-large")
     else:
         raise ValueError("unknown tokenizer type")
 
     # load "main" model and its explainer
     classifier, params, dummy_inputs, dummy_state = create_model(
         key=next(keyseq),
+        vocab_size=len(tokenizer),
         num_classes=num_classes,
         arch=args.arch,
         batch_size=args.batch_size,
@@ -423,7 +474,8 @@ def main():
         if simulability:
             teacher_predict = jax.jit(lambda x: teacher.apply(teacher_params, **x)[0])
 
-        total, total_correct, total_loss = 0, 0, 0
+        total, total_loss = 0, 0
+        all_outputs, all_y = [], []
         for x, y in dataloader(
             data,
             tokenizer,
@@ -432,17 +484,27 @@ def main():
             shuffle=False,
         ):
             if simulability:
-                y = jnp.argmax(teacher_predict(x), axis=-1)
+                y = teacher_predict(x)
+                if task_type == "classification":
+                    y = jnp.argmax(teacher_predict(x), axis=-1)
 
-            loss, acc = eval_step(classifier, params, x, y)
-            total_loss += loss * y.shape[0]
-            total_correct += acc * y.shape[0]
+            loss, outputs = eval_step(classifier, criterion, params, x, y)
             total += y.shape[0]
-        return total_loss / total, total_correct / total
+            total_loss += loss * y.shape[0]
+            all_outputs.append(outputs)
+            all_y.append(y)
+
+        all_outputs = jnp.concatenate(all_outputs, axis=0)
+        all_y = jnp.concatenate(all_y, axis=0)
+        metrics_values = []
+        for i, metric in enumerate(metrics):
+            metrics_values.append(metric(all_outputs, all_y))
+
+        return total_loss / total, metrics_values
 
     num_epochs = args.num_epochs if args.num_epochs is not None else LARGE_INT
     inner_step = 0
-    best_metric = 0
+    best_metric = float("-inf")
     for epoch in range(num_epochs):
         if args.setup == "learnable_teacher":
             valid_dataloader = cycle(
@@ -471,7 +533,14 @@ def main():
         ):
             if args.setup == "no_teacher":
                 loss, params, opt_state = train_step(
-                    classifier, optimizer.update, params, opt_state, next(keyseq), x, y
+                    classifier,
+                    criterion,
+                    optimizer.update,
+                    params,
+                    opt_state,
+                    next(keyseq),
+                    x,
+                    y,
                 )
             else:
                 (
@@ -483,6 +552,7 @@ def main():
                     explainer,
                     teacher,
                     teacher_explainer,
+                    criterion,
                     optimizer.update,
                     params,
                     explainer_params,
@@ -510,6 +580,7 @@ def main():
                     explainer,
                     teacher,
                     teacher_explainer,
+                    criterion,
                     metaoptimizer.update,
                     params,
                     explainer_params,
@@ -525,11 +596,11 @@ def main():
                     inner_lr=args.learning_rate,
                 )
 
-        valid_loss, valid_metric = evaluate(
+        valid_loss, valid_metrics = evaluate(
             valid_data, params, simulability=(args.setup != "no_teacher")
         )
-        if valid_metric > best_metric:
-            best_metric = valid_metric
+        if valid_metrics[0] > best_metric:
+            best_metric = valid_metrics[0]
             best_params = params
             if args.model_dir is not None:
                 save_model(args.model_dir, classifier, params)
@@ -548,23 +619,29 @@ def main():
         else:
             not_improved += 1
 
+        metric_logs = []
+        for f, value in zip(metrics, valid_metrics):
+            metric_logs.append((f"valid_{f.__name__}", value))
+
         bar.add(
             1,
             values=[
                 ("valid_loss", valid_loss),
-                (
-                    f"valid_{'sim' if args.setup!='no_teacher' else 'acc'}",
-                    valid_metric,
-                ),
+                *metric_logs,
             ],
         )
 
         if not_improved > args.patience:
             break
 
+    import ipdb
+
+    ipdb.set_trace()
     # TODO: make this more general
     if args.setup != "no_teacher":
         test_data = load_data("imdb", args.setup, "test")
+        import ipdb
+
         _, test_acc = evaluate(test_data, best_params)
         _, test_sim = evaluate(test_data, best_params, simulability=True)
         print(f"Test Accuracy: {test_acc:.04f}; Test Simulability: {test_sim:.04f}")

@@ -3,7 +3,7 @@ import jax.numpy as jnp
 from transformers.models.bert.modeling_flax_bert import FlaxBertModule
 
 
-class BertClassifier(nn.Module):
+class BertModel(nn.Module):
     """A Bert-based classification module"""
 
     num_classes: int
