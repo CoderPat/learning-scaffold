@@ -6,41 +6,115 @@ import flax
 import flax.linen as nn
 import jax
 import jax.numpy as jnp
-from transformers import FlaxElectraForSequenceClassification
+from transformers import (
+    BertConfig,
+    ElectraConfig,
+    DistilBertConfig,
+    RobertaConfig,
+    FlaxElectraForSequenceClassification,
+    FlaxBertForSequenceClassification,
+    FlaxDistilBertForSequenceClassification,
+    FlaxRobertaForSequenceClassification,
+)
 
 from meta_expl.utils import is_jsonable
 
-from .electra import ElectraClassifier
-from .embedding import EmbedAttentionClassifier
-from .recurrent import BiLSTMClassifier
+from .bert import BertModel
+from .distilbert import DistilBertModel
+from .electra import ElectraModel
+from .roberta import RobertaModel
+from .embedding import EmbedAttentionModel
+from .recurrent import BiLSTMModel
 
 # TODO: major refactor of this
 
 
 def create_model(
     key: jax.random.PRNGKey,
+    inputs: Dict[str, Any],
+    vocab_size: int,
     num_classes: int,
     arch: str = "bert",
     batch_size: int = 16,
     max_len: int = 512,
+    embeddings_dim: int = 256,
+    embeddings: jnp.array = None,
 ):
     # instantiate model parameters
-    input_ids = jnp.ones((batch_size, max_len), jnp.int32)
-    dummy_inputs = {
-        "input_ids": input_ids,
-        "attention_mask": jnp.ones_like(input_ids),
-        "token_type_ids": jnp.arange(jnp.atleast_2d(input_ids).shape[-1]),
-        "position_ids": jnp.ones_like(input_ids),
-    }
 
-    if arch == "bert":
-        raise ValueError("not implemented")
+    if arch == "mbert":
+        # load pretrained model and create module based on its parameters
+        model = FlaxBertForSequenceClassification.from_pretrained(
+            "bert-base-multilingual-cased",
+            num_labels=num_classes,
+            from_pt=arch == "rembert",
+        )
+
+        assert vocab_size == model.config.vocab_size
+        classifier = BertModel(
+            num_labels=num_classes,
+            config=model.config,
+        )
+        params = classifier.init(key, **inputs)
+
+        # replace original parameters with pretrained parameters
+        params = params.unfreeze()
+
+        assert "FlaxBertForSequenceClassificationModule_0" in params["params"]
+        params["params"]["FlaxBertForSequenceClassificationModule_0"] = model.params
+        params = flax.core.freeze(params)
+
+    elif arch == "mbert-distill":
+        # load pretrained model and create module based on its parameters
+        model = FlaxDistilBertForSequenceClassification.from_pretrained(
+            "distilbert-base-multilingual-cased",
+            num_labels=num_classes,
+            from_pt=True,
+        )
+
+        assert vocab_size == model.config.vocab_size
+        classifier = DistilBertModel(num_labels=num_classes, config=model.config)
+        params = classifier.init(key, **inputs)
+
+        # replace original parameters with pretrained parameters
+        params = params.unfreeze()
+
+        assert "FlaxDistilBertForSequenceClassificationModule_0" in params["params"]
+        params["params"][
+            "FlaxDistilBertForSequenceClassificationModule_0"
+        ] = model.params
+        params = flax.core.freeze(params)
+
+    elif arch == "xlm-r" or arch == "xlm-r-large":
+        model = FlaxRobertaForSequenceClassification.from_pretrained(
+            "xlm-roberta-base" if arch == "xlm-r" else "xlm-roberta-large",
+            num_labels=num_classes,
+            from_pt=True,
+        )
+        assert vocab_size == model.config.vocab_size
+
+        classifier = RobertaModel(
+            num_labels=num_classes,
+            config=model.config,
+        )
+        params = classifier.init(key, **inputs)
+
+        # replace original parameters with pretrained parameters
+        params = params.unfreeze()
+
+        assert "FlaxRobertaForSequenceClassificationModule_0" in params["params"]
+        params["params"]["FlaxRobertaForSequenceClassificationModule_0"] = model.params
+        params = flax.core.freeze(params)
+
     elif arch == "electra":
         # load pretrained model and create module based on its parameters
         model = FlaxElectraForSequenceClassification.from_pretrained(
-            "google/electra-small-discriminator"
+            "google/electra-small-discriminator",
+            num_labels=num_classes,
         )
-        classifier = ElectraClassifier(
+
+        assert vocab_size == model.config.vocab_size
+        classifier = ElectraModel(
             num_labels=num_classes,
             vocab_size=model.config.vocab_size,
             embedding_size=model.config.embedding_size,
@@ -54,7 +128,7 @@ def create_model(
             dropout_rate=model.config.hidden_dropout_prob,
             hidden_act=model.config.hidden_act,
         )
-        params = classifier.init(key, **dummy_inputs)
+        params = classifier.init(key, **inputs)
 
         # replace original parameters with pretrained parameters
         params = params.unfreeze()
@@ -63,28 +137,40 @@ def create_model(
         params = flax.core.freeze(params)
 
     elif arch == "lstm":
-        # hard-coded vocab size to avoid loading extra copy of ELECTRA
-        vocab_size = 30522
-
-        classifier = BiLSTMClassifier(
+        classifier = BiLSTMModel(
             num_classes=num_classes,
             vocab_size=vocab_size,
+            embedding_size=embeddings.shape[1]
+            if embeddings is not None
+            else embeddings_dim,
         )
 
         # instantiate model parameters
-        params = classifier.init(key, **dummy_inputs)
+        params = classifier.init(key, **inputs)
+        if embeddings is not None:
+            classifier.replace_embeddings(params, embeddings)
 
     elif arch == "embedding":
-        # hard-coded vocab size to avoid loading extra copy of ELECTRA
-        vocab_size = 30522
-
-        classifier = EmbedAttentionClassifier(
+        classifier = EmbedAttentionModel(
             num_classes=num_classes,
             vocab_size=vocab_size,
+            embedding_size=embeddings[0].shape[1]
+            if embeddings is not None
+            else embeddings_dim,
+            max_position_embeddings=embeddings[0].shape[1]
+            if embeddings is not None
+            else max_len,
         )
 
         # instantiate model parameters
-        params = classifier.init(key, **dummy_inputs)
+        params = classifier.init(key, **inputs)
+        if embeddings is not None:
+            classifier.replace_embeddings(params, embeddings)
+
+        # instantiate model parameters
+        params = classifier.init(key, **inputs)
+        if embeddings is not None:
+            classifier.replace_embeddings(params, embeddings)
 
     else:
         raise ValueError("unknown model type")
@@ -92,9 +178,9 @@ def create_model(
     # create dummy state for initalizing an explainer
     _, dummy_state = classifier.apply(
         params,
-        **dummy_inputs,
+        **inputs,
     )
-    return classifier, params, dummy_inputs, dummy_state
+    return classifier, params, dummy_state
 
 
 def save_model(
@@ -111,9 +197,29 @@ def save_model(
     # save model + config
     with open(os.path.join(model_dir, f"model_{suffix}.ckpt"), "wb") as f:
         f.write(flax.serialization.to_bytes(params))
+
     with open(os.path.join(model_dir, "config.json"), "w") as f:
-        serializable_args = {k: v for k, v in model.__dict__.items() if is_jsonable(v)}
-        json.dump(serializable_args, f)
+        config = {}
+        config["model_args"] = {
+            k: v for k, v in model.__dict__.items() if is_jsonable(v)
+        }
+        if hasattr(model, "config"):
+            config["model_baseconfig"] = model.config.to_dict()
+        if model.__class__ == BertModel:
+            config["model_type"] = "bert"
+        elif model.__class__ == DistilBertModel:
+            config["model_type"] = "distilbert"
+        elif model.__class__ == ElectraModel:
+            config["model_type"] = "electra"
+        elif model.__class__ == RobertaModel:
+            config["model_type"] = "roberta"
+        elif model.__class__ == EmbedAttentionModel:
+            config["model_type"] = "embed"
+        elif model.__class__ == BiLSTMModel:
+            config["model_type"] = "recurrent"
+        else:
+            raise ValueError("unknown model type")
+        json.dump(config, f)
 
 
 def load_model(
@@ -128,13 +234,41 @@ def load_model(
     TODO(CoderPat): fix this to accept models other than electra
     """
     with open(os.path.join(model_dir, "config.json")) as f:
-        args = json.load(f)
+        config = json.load(f)
 
-    classifier = ElectraClassifier(**args)
+    baseconfig = None
+    if config["model_type"] == "bert":
+        if "model_baseconfig" in config:
+            baseconfig = BertConfig.from_dict(config["model_baseconfig"])
+        model_class = BertModel
+    elif config["model_type"] == "distilbert":
+        if "model_baseconfig" in config:
+            baseconfig = DistilBertConfig.from_dict(config["model_baseconfig"])
+        model_class = DistilBertModel
+    elif config["model_type"] == "electra":
+        if "model_baseconfig" in config:
+            baseconfig = ElectraConfig.from_dict(config["model_baseconfig"])
+        model_class = ElectraModel
+    elif config["model_type"] == "roberta":
+        if "model_baseconfig" in config:
+            baseconfig = RobertaConfig.from_dict(config["model_baseconfig"])
+        model_class = RobertaModel
+    elif config["model_type"] == "embed":
+        model_class = EmbedAttentionModel
+    elif config["model_type"] == "recurrent":
+        model_class = BiLSTMModel
+    else:
+        raise ValueError("unknown model type")
+
+    classifier = (
+        model_class(config=baseconfig, **config["model_args"])
+        if baseconfig is not None
+        else model_class(**config["model_args"])
+    )
 
     # instantiate (dummy) model parameters
     key = jax.random.PRNGKey(0)
-    dummy_inputs = jnp.ones((batch_size, max_len))
+    dummy_inputs = jnp.ones((batch_size, max_len), jnp.int32)
     params = classifier.init(key, dummy_inputs)
 
     # replace params with saved params

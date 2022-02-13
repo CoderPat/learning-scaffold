@@ -12,7 +12,7 @@ class HiddenQKExplainer(SaliencyExplainer):
     to a learnable query.
     """
 
-    layer_idx: int = -1  # layer from which to use attention from
+    layer_idx: int = 0  # layer from which to use attention from
     kq_dim: int = 1028
 
     def logit_computation(self, inputs, state):

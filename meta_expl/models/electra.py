@@ -6,7 +6,7 @@ from transformers.models.electra.modeling_flax_electra import (
 )
 
 
-class ElectraClassifier(nn.Module):
+class ElectraModel(nn.Module):
     """A Electra-based classification module"""
 
     num_labels: int
@@ -35,6 +35,7 @@ class ElectraClassifier(nn.Module):
         position_ids=None,
         deterministic: bool = True,
     ):
+
         if token_type_ids is None:
             token_type_ids = jnp.ones_like(input_ids)
         if position_ids is None:
@@ -72,3 +73,13 @@ class ElectraClassifier(nn.Module):
         )
         state = {"hidden_states": hidden_states, "attentions": attentions}
         return outputs, state
+
+    def extract_embeddings(self, params):
+        return (
+            params["params"]["FlaxElectraForSequenceClassificationModule_0"]["electra"][
+                "embeddings"
+            ]["word_embeddings"]["embedding"],
+            params["params"]["FlaxElectraForSequenceClassificationModule_0"]["electra"][
+                "embeddings"
+            ]["position_embeddings"]["embedding"],
+        )

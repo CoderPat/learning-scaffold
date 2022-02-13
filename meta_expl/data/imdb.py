@@ -7,7 +7,6 @@ from transformers import PreTrainedTokenizerFast
 
 
 def load_data(
-    dataset: str,
     setup: str,
     split: str,
     teacher_valid_size: int = 12500,
@@ -18,21 +17,18 @@ def load_data(
     """
     Dataset reader function used for loading:
     text and labels for training, development and testing.
-
     Split sizes are done according to https://arxiv.org/abs/2012.00893
     (but the exact splits are different)
-
     Args:
         dataset: tag to retrieve a HF dataset;
         setup: TODO
         split: flag to return the train/validation/test set.
-
     Returns:
         List of text and labels respective to the split of the dataset that
         was chosen (already shuffled).
     """
 
-    hf_dataset = load_dataset(dataset)
+    hf_dataset = load_dataset("imdb")
     original_split = "train" if (setup == "no_teacher" and split == "train") else "test"
     data = hf_dataset[original_split]
     data = list(data)
@@ -73,7 +69,6 @@ def dataloader(
 ):
     """
     Dataloading function that takes a dataset and yields batcheds of data
-
     Args:
         dataset: a list of samples with the respective label
         tokenizer: a HugginFace (fast) tokenizer
@@ -94,10 +89,10 @@ def dataloader(
         for j in range(batch_size):
             if i + j >= len(idxs):
                 break
-            labels, tokens = dataset[idxs[i + j]].values()
+            sample = dataset[idxs[i + j]]
             batch_idxs.append(idxs[i + j])
-            batch_inputs.append(tokens)
-            batch_outputs.append(jnp.array(labels))
+            batch_inputs.append(sample["text"])
+            batch_outputs.append(jnp.array(sample["label"]))
 
         batch_inputs = dict(
             tokenizer(
