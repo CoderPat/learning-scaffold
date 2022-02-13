@@ -2,16 +2,18 @@ import json
 import os
 from abc import ABCMeta
 from typing import Any, Callable, Dict, Union
+from functools import partial
 
 import importlib
 
 import flax
 import flax.linen as nn
 import jax
+import jax.numpy as jnp
 from entmax_jax import entmax15, sparsemax
 from entmax_jax.losses import entmax_loss, softmax_loss, sparsemax_loss
 
-from meta_expl.utils import is_jsonable
+from meta_expl.utils import is_jsonable, topk_softmax
 
 EXPLAINER_REGISTRY = {}
 
@@ -144,6 +146,8 @@ class SaliencyExplainer(Explainer, metaclass=ABCMeta):
             return sparsemax
         elif self.normalizer_fn == "entmax":
             return entmax15
+        elif self.normalizer_fn == "topk_softmax":
+            return partial(topk_softmax, topk=0.25)
         else:
             return self.normalizer_fn
 
@@ -151,11 +155,17 @@ class SaliencyExplainer(Explainer, metaclass=ABCMeta):
     def __call__(self, inputs, state):
         normalizer_fn = self.prepare_normalizer_fn()
         logits = self.logit_computation(inputs, state)
-        return normalizer_fn(logits, axis=-1), {"z": logits}
+        bias = jax.lax.select(
+            inputs["attention_mask"] > 0,
+            jnp.full(inputs["attention_mask"].shape, 0.0),
+            jnp.full(inputs["attention_mask"].shape, -1e10),
+        )
+        return normalizer_fn(logits + bias, axis=-1), {"z": logits}
 
     @classmethod
     def loss_fn(
         cls,
+        inputs: Dict[str, Any],
         teacher_explainer: "SaliencyExplainer",
         student_explainer: "SaliencyExplainer",
         teacher_explanation,
@@ -180,9 +190,12 @@ class SaliencyExplainer(Explainer, metaclass=ABCMeta):
         # TODO: check if student/teacher order is correct
         if (
             student_explainer.normalizer_fn == "softmax"
-            and teacher_explainer.normalizer_fn in ("sparsemax", "entmax15", "softmax")
+            and teacher_explainer.normalizer_fn
+            in ("sparsemax", "entmax15", "softmax", "topk_softmax")
         ):
-            return softmax_loss(student_explanation, teacher_explanation)
+            return softmax_loss(
+                student_explanation, teacher_explanation, mask=inputs["attention_mask"]
+            )
 
         raise ValueError("Unknown teacher/student explainer combination type")
 

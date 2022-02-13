@@ -7,11 +7,13 @@ import flax.linen as nn
 import jax
 import jax.numpy as jnp
 from transformers import (
+    BertConfig,
+    ElectraConfig,
+    DistilBertConfig,
+    RobertaConfig,
     FlaxElectraForSequenceClassification,
     FlaxBertForSequenceClassification,
     FlaxDistilBertForSequenceClassification,
-)
-from transformers.models.roberta.modeling_flax_roberta import (
     FlaxRobertaForSequenceClassification,
 )
 
@@ -29,20 +31,16 @@ from .recurrent import BiLSTMModel
 
 def create_model(
     key: jax.random.PRNGKey,
+    inputs: Dict[str, Any],
     vocab_size: int,
     num_classes: int,
     arch: str = "bert",
     batch_size: int = 16,
     max_len: int = 512,
+    embeddings_dim: int = 256,
+    embeddings: jnp.array = None,
 ):
     # instantiate model parameters
-    input_ids = jnp.ones((batch_size, max_len), jnp.int32)
-    dummy_inputs = {
-        "input_ids": input_ids,
-        "attention_mask": jnp.ones_like(input_ids),
-        "token_type_ids": jnp.arange(jnp.atleast_2d(input_ids).shape[-1]),
-        "position_ids": jnp.ones_like(input_ids),
-    }
 
     if arch == "mbert":
         # load pretrained model and create module based on its parameters
@@ -57,7 +55,7 @@ def create_model(
             num_labels=num_classes,
             config=model.config,
         )
-        params = classifier.init(key, **dummy_inputs)
+        params = classifier.init(key, **inputs)
 
         # replace original parameters with pretrained parameters
         params = params.unfreeze()
@@ -76,7 +74,7 @@ def create_model(
 
         assert vocab_size == model.config.vocab_size
         classifier = DistilBertModel(num_labels=num_classes, config=model.config)
-        params = classifier.init(key, **dummy_inputs)
+        params = classifier.init(key, **inputs)
 
         # replace original parameters with pretrained parameters
         params = params.unfreeze()
@@ -94,11 +92,12 @@ def create_model(
             from_pt=True,
         )
         assert vocab_size == model.config.vocab_size
+
         classifier = RobertaModel(
             num_labels=num_classes,
             config=model.config,
         )
-        params = classifier.init(key, **dummy_inputs)
+        params = classifier.init(key, **inputs)
 
         # replace original parameters with pretrained parameters
         params = params.unfreeze()
@@ -129,7 +128,7 @@ def create_model(
             dropout_rate=model.config.hidden_dropout_prob,
             hidden_act=model.config.hidden_act,
         )
-        params = classifier.init(key, **dummy_inputs)
+        params = classifier.init(key, **inputs)
 
         # replace original parameters with pretrained parameters
         params = params.unfreeze()
@@ -141,19 +140,37 @@ def create_model(
         classifier = BiLSTMModel(
             num_classes=num_classes,
             vocab_size=vocab_size,
+            embedding_size=embeddings.shape[1]
+            if embeddings is not None
+            else embeddings_dim,
         )
 
         # instantiate model parameters
-        params = classifier.init(key, **dummy_inputs)
+        params = classifier.init(key, **inputs)
+        if embeddings is not None:
+            classifier.replace_embeddings(params, embeddings)
 
     elif arch == "embedding":
         classifier = EmbedAttentionModel(
             num_classes=num_classes,
             vocab_size=vocab_size,
+            embedding_size=embeddings[0].shape[1]
+            if embeddings is not None
+            else embeddings_dim,
+            max_position_embeddings=embeddings[0].shape[1]
+            if embeddings is not None
+            else max_len,
         )
 
         # instantiate model parameters
-        params = classifier.init(key, **dummy_inputs)
+        params = classifier.init(key, **inputs)
+        if embeddings is not None:
+            classifier.replace_embeddings(params, embeddings)
+
+        # instantiate model parameters
+        params = classifier.init(key, **inputs)
+        if embeddings is not None:
+            classifier.replace_embeddings(params, embeddings)
 
     else:
         raise ValueError("unknown model type")
@@ -161,9 +178,9 @@ def create_model(
     # create dummy state for initalizing an explainer
     _, dummy_state = classifier.apply(
         params,
-        **dummy_inputs,
+        **inputs,
     )
-    return classifier, params, dummy_inputs, dummy_state
+    return classifier, params, dummy_state
 
 
 def save_model(
@@ -186,6 +203,8 @@ def save_model(
         config["model_args"] = {
             k: v for k, v in model.__dict__.items() if is_jsonable(v)
         }
+        if hasattr(model, "config"):
+            config["model_baseconfig"] = model.config.to_dict()
         if model.__class__ == BertModel:
             config["model_type"] = "bert"
         elif model.__class__ == DistilBertModel:
@@ -217,20 +236,39 @@ def load_model(
     with open(os.path.join(model_dir, "config.json")) as f:
         config = json.load(f)
 
+    baseconfig = None
     if config["model_type"] == "bert":
-        classifier = BertModel(**config["model_args"])
+        if "model_baseconfig" in config:
+            baseconfig = BertConfig.from_dict(config["model_baseconfig"])
+        model_class = BertModel
+    elif config["model_type"] == "distilbert":
+        if "model_baseconfig" in config:
+            baseconfig = DistilBertConfig.from_dict(config["model_baseconfig"])
+        model_class = DistilBertModel
     elif config["model_type"] == "electra":
-        classifier = ElectraModel(**config["model_args"])
+        if "model_baseconfig" in config:
+            baseconfig = ElectraConfig.from_dict(config["model_baseconfig"])
+        model_class = ElectraModel
+    elif config["model_type"] == "roberta":
+        if "model_baseconfig" in config:
+            baseconfig = RobertaConfig.from_dict(config["model_baseconfig"])
+        model_class = RobertaModel
     elif config["model_type"] == "embed":
-        classifier = EmbedAttentionModel(**config["model_args"])
+        model_class = EmbedAttentionModel
     elif config["model_type"] == "recurrent":
-        classifier = BiLSTMModel(**config["model_args"])
+        model_class = BiLSTMModel
     else:
         raise ValueError("unknown model type")
 
+    classifier = (
+        model_class(config=baseconfig, **config["model_args"])
+        if baseconfig is not None
+        else model_class(**config["model_args"])
+    )
+
     # instantiate (dummy) model parameters
     key = jax.random.PRNGKey(0)
-    dummy_inputs = jnp.ones((batch_size, max_len))
+    dummy_inputs = jnp.ones((batch_size, max_len), jnp.int32)
     params = classifier.init(key, dummy_inputs)
 
     # replace params with saved params

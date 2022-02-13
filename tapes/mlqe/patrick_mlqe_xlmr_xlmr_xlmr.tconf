@@ -1,0 +1,89 @@
+global {
+    ducttape_output="/projects/tir2/users/pfernand/metaexpl-experiments/mlqe-xlmr-xlmr-alllayers"
+    ducttape_experimental_submitters=true
+    ducttape_experimental_imports=true
+    repo="/home/pfernand/repos/meta-expl"
+
+    task="mlqe"
+    task_params=""
+    num_examples=(NumExamples: 4100 1050 2100 8400)
+    metric="pearson"
+
+    # models and explainers parameters
+    teacher_arch=xlm-r
+    student_arch=xlm-r
+    init_embed=true
+
+    teacher_explainer=(
+        TeacherExplainer:
+            attention="attention_explainer"
+            attention_query="attention_query_explainer"
+            hidden_qk="hidden_qk_explainer"
+    )
+    student_explainer=attention_explainer
+
+    teacher_normalizer_fn=(TeacherNormalizerFn: softmax topk_softmax)
+    student_normalizer_fn=softmax
+    teacher_init_fn=uniform
+    teacher_aggregator_idx="\"mean\""
+    student_aggregator_idx="\"mean\""
+    teacher_aggregator_dim="\"row\""
+    student_aggregator_dim="\"row\""
+    parametrize_head_coeffs=true
+    normalize_head_coeffs=(NormalizeHeadCoeffs: sparsemax="\"sparsemax\"" false=false)
+    teacher_layer_idx=null
+    student_layer_idx=-1
+    
+
+    # optimization paramaters
+    student_optimizer=sgd
+    num_epochs=""
+    batch_size=16
+    lr=5e-3
+    kld_coeff=(KLDCoeff: 0 5)
+    patience=5
+
+    # (meta) optimization parameters
+    metalearn=(
+        MetaLearn:
+            false=false
+            true=true
+    )
+    meta_lr=(MetaLR: 1e-3 2e-3 1e-4 2e-4 5e-4 1e-5)
+    meta_interval=(MetaInterval: 1 25 100 200 500)
+    meta_explicit=(MetaExplicit: false true)
+    meta_warmup=0
+    num_resets=(NumResets: 0 100 200 300)
+
+    seed=(Seed: 0 9 11) #  30 69)
+
+    wandb_project="meta-expl-mlqe-xlmr-xlmr-alllayers"
+
+    exclude="tir-0-[7,9,11,13,15,17,19,32,36],tir-1-13,tir-1-18,tir-1-23"
+    submitter=slurm
+}
+
+plan TrainTeacher {
+    reach TrainTeacher
+}
+
+plan TrainStudent { 
+    reach AverageResults via (KLDCoeff: 0) * (NumExamples: *)
+    reach AverageResults via (KLDCoeff: 5) * (TeacherExplainer: attention) * (NumExamples: *)
+    reach AverageResults via (KLDCoeff: 5) * (TeacherExplainer: attention) * (TeacherNormalizerFn: topk_softmax) * (NumExamples: *)
+}
+
+plan MetaTrain {
+    reach AverageResults via (KLDCoeff: 5) * (MetaLearn: true) * (TeacherExplainer: attention) * (MetaLR: 2e-4) * (MetaInterval: 1) * (MetaExplicit: true) * (NumExamples: *)
+    reach AverageResults via (KLDCoeff: 5) * (MetaLearn: true) * (TeacherExplainer: attention) * (MetaLR: 2e-4) * (MetaInterval: 1) * (MetaExplicit: true) * (TeacherNormalizerFn: topk_softmax) * (NumExamples: *)
+    #reach AverageResults via (KLDCoeff: 5) * (MetaLearn: true) * (TeacherExplainer: attention) * (MetaLR: 5e-4) * (MetaInterval: 25) 
+    #reach AverageResults via (KLDCoeff: 5) * (MetaLearn: true) * (TeacherExplainer: attention) * (MetaLR: 5e-4) * (MetaInterval: 100) * (NumResets: 100)
+    #reach AverageResults via (KLDCoeff: 5) * (MetaLearn: true) * (TeacherExplainer: attention) * (MetaLR: 5e-4) * (MetaInterval: 500) * (NumResets: 100) 
+}
+
+#plan NonNormalized {
+#    reach AverageResults via (KLDCoeff: 5) * (TeacherExplainer: attention) * (NormalizeHeadCoeffs: false)
+#    reach AverageResults via (KLDCoeff: 5) * (TeacherExplainer: attention) * (NormalizeHeadCoeffs: false) * (MetaLearn: true) * (MetaLR: 1e-4) * (MetaInterval: 1) * (MetaExplicit: true)
+#}
+
+

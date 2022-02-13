@@ -5,6 +5,7 @@ import flax.linen as nn
 import jax
 import jax.numpy as jnp
 from flax.training import common_utils
+
 from optax import (
     GradientTransformation,
     additive_weight_decay,
@@ -13,7 +14,47 @@ from optax import (
     scale_by_schedule,
     scale_by_adam,
     warmup_exponential_decay_schedule,
+    identity as opt_identity,
+    trace as opt_trace,
 )
+
+
+def topk_uniform(logits, axis=-1, topk=0.1):
+    # WARNING: non-differentiable
+    threshold = -1e-7
+    numtoks = jnp.sum(jnp.where(logits > threshold, 1, 0), axis=axis)
+    topk_numtoks = jnp.maximum(jnp.round(numtoks * topk), 1)
+    unnorm_probs = jnp.where(
+        jnp.argsort(logits, axis=axis) < topk_numtoks[:, None], 1, 0
+    )
+    return unnorm_probs / jnp.sum(unnorm_probs, axis=axis, keepdims=True)
+
+
+def batched_scatter(input, index, src):
+    """2-d batched scatter"""
+    idx = jnp.arange(input.shape[0]).reshape((-1, 1))
+    idx = jnp.repeat(idx, input.shape[1], 1)
+    return input.at[idx, index].set(src)
+
+
+def topk_softmax(logits, axis=-1, topk=0.1, temperature=1):
+    # TODO: currently only works for 2-d tensors with axis=-1
+    threshold = -1e7
+    numtoks = jnp.sum(jnp.where(logits > threshold, 1, 0), axis=axis)
+    topk_numtoks = jnp.maximum(jnp.round(numtoks * topk), 1)
+
+    # obtain ranks from argsort
+    sorted_idx = jnp.argsort(logits, axis=axis)[:, ::-1]
+    zeros = jnp.zeros(logits.shape, sorted_idx.dtype)
+    ranges = jnp.repeat(
+        jnp.arange(logits.shape[-1]).reshape((1, -1)), logits.shape[0], 0
+    )
+    ranks = batched_scatter(zeros, sorted_idx, ranges)
+
+    topk_logits = jnp.where(
+        ranks < topk_numtoks[:, None], logits * temperature, threshold
+    )
+    return nn.softmax(topk_logits, axis=axis)
 
 
 def cross_entropy_loss(logits, targets):
@@ -38,11 +79,12 @@ def mse_loss(outputs, targets):
 
 
 def accuracy(outputs, targets):
-    if outputs.ndim + 1 != targets.ndim:
+    if outputs.ndim != targets.ndim + 1:
         raise ValueError(
             "Incorrect shapes. Got shape %s outputs and %s targets"
             % (str(outputs.shape), str(targets.shape))
         )
+
     return jnp.mean(jnp.argmax(outputs, axis=-1) == targets)
 
 
@@ -71,19 +113,60 @@ def adamw_with_clip(
     b2: float = 0.999,
     eps: float = 1e-8,
     eps_root: float = 0.0,
-    weight_decay: float = 1e-6,
+    weight_decay: float = 1e-3,
     max_norm: float = 1.0,
 ) -> GradientTransformation:
-    schedule_fn = warmup_exponential_decay_schedule(
-        init_value=-1e-6,
-        peak_value=-learning_rate,
-        warmup_steps=warmup_steps,
-        transition_steps=0,
-        decay_rate=0,
-    )
+    if warmup_steps > 0:
+        schedule_fn = warmup_exponential_decay_schedule(
+            init_value=-1e-6,
+            peak_value=-learning_rate,
+            warmup_steps=warmup_steps,
+            transition_steps=0,
+            decay_rate=0,
+        )
+    else:
+        schedule_fn = lambda _: -learning_rate
+
     return chain(
         clip_by_global_norm(max_norm),
         scale_by_adam(b1=b1, b2=b2, eps=eps, eps_root=eps_root),
+        additive_weight_decay(weight_decay),
+        scale_by_schedule(schedule_fn),
+    )
+
+
+def optimizer_with_clip(
+    optimizer: str,
+    learning_rate: float,
+    warmup_steps: int = 1000,
+    b1: float = 0.9,
+    b2: float = 0.999,
+    eps: float = 1e-8,
+    eps_root: float = 1e-8,
+    weight_decay: float = 0,
+    max_norm: float = 1.0,
+) -> GradientTransformation:
+    if warmup_steps > 0:
+        schedule_fn = warmup_exponential_decay_schedule(
+            init_value=-1e-6,
+            peak_value=-learning_rate,
+            warmup_steps=warmup_steps,
+            transition_steps=0,
+            decay_rate=0,
+        )
+    else:
+        schedule_fn = lambda _: -learning_rate
+
+    if optimizer == "adamw":
+        scale_fn = scale_by_adam(b1=b1, b2=b2, eps=eps, eps_root=eps_root)
+    elif optimizer == "sgd":
+        scale_fn = opt_identity()
+    elif optimizer == "sgd_momentum":
+        scale_fn = opt_trace(decay=0.9)
+
+    return chain(
+        clip_by_global_norm(max_norm),
+        scale_fn,
         additive_weight_decay(weight_decay),
         scale_by_schedule(schedule_fn),
     )

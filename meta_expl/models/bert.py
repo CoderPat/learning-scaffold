@@ -42,3 +42,8 @@ class BertModel(nn.Module):
         )
         state = {"hidden_states": hidden_states, "attentions": attentions}
         return outputs, state
+
+    def extract_embeddings(self, params):
+        return params["params"]["FlaxRobertaForSequenceClassificationModule_0"][
+            "roberta"
+        ]["embeddings"]["word_embeddings"]["embedding"]

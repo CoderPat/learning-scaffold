@@ -1,35 +1,36 @@
 from typing import Dict, List
-from pathlib import Path
-import pandas as pd
 
 import jax.numpy as jnp
+from datasets import load_dataset
 from numpy import random
 from transformers import PreTrainedTokenizerFast
 
 
-def load_data(setup: str, split: str, seed: int = 0):
-    split_n = "dev" if split == "valid" else split
-    langpairs = ["en-de", "en-zh", "et-en", "ne-en", "ro-en", "ru-en"]
-    dataset = []
-    for langpair in langpairs:
-        data = (
-            Path(__file__).parents[1]
-            / "mlqe-pe"
-            / "data"
-            / "direct-assessments"
-            / split_n
-            / (f"{langpair}-{split_n}" if split != "test" else f"{langpair}")
-            / f"{split_n if split != 'test' else 'test20'}.{langpair.replace('-', '')}.df.short.tsv"
-        )
-        with open(data, "r") as f:
-            df = pd.read_csv(f, sep="\t", usecols=[1, 2, 3, 4, 5, 6], quoting=3)
-            dataset.extend(
-                {**row.to_dict(), "langpair": langpair} for _, row in df.iterrows()
-            )
+def load_data(
+    setup: str,
+    split: str,
+    seed: int = 0,
+):
+    """
+    Dataset reader function used for loading:
+    text and labels for training, development and testing.
+    Split sizes are done according to https://arxiv.org/abs/2012.00893
+    (but the exact splits are different)
+    Args:
+        dataset: tag to retrieve a HF dataset;
+        setup: TODO
+        split: flag to return the train/validation/test set.
+    Returns:
+        List of text and labels respective to the split of the dataset that
+        was chosen (already shuffled).
+    """
 
+    hf_dataset = load_dataset("glue", "sst2")
+    data = hf_dataset["validation" if split == "valid" else split]
+    data = list(data)
     rng = random.RandomState(seed)
-    rng.shuffle(dataset)
-    return dataset
+    rng.shuffle(data)
+    return data
 
 
 def dataloader(
@@ -39,7 +40,6 @@ def dataloader(
     shuffle: bool = True,
     max_len: int = 64,
     idxs: List[int] = None,
-    sep_token: str = "[SEP]",
 ):
     """
     Dataloading function that takes a dataset and yields batcheds of data
@@ -58,7 +58,6 @@ def dataloader(
     else:
         assert isinstance(idxs, (list, tuple))
         assert all(map(lambda x: isinstance(x, int), idxs))
-
     for i in range(0, len(idxs), batch_size):
         batch_inputs, batch_outputs, batch_idxs = [], [], []
         for j in range(batch_size):
@@ -66,10 +65,8 @@ def dataloader(
                 break
             sample = dataset[idxs[i + j]]
             batch_idxs.append(idxs[i + j])
-            batch_inputs.append(
-                f"{sample['original']} {sep_token} {sample['translation']}"
-            )
-            batch_outputs.append(jnp.array([float(sample["z_mean"])]))
+            batch_inputs.append(sample["sentence"])
+            batch_outputs.append(jnp.array(sample["label"]))
 
         batch_inputs = dict(
             tokenizer(

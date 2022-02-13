@@ -1,7 +1,10 @@
 from typing import Callable, Union
 
+import jax
 import flax.linen as nn
 import jax.numpy as jnp
+
+from entmax_jax.activations import sparsemax, entmax15
 
 from . import SaliencyExplainer, register_explainer
 
@@ -15,9 +18,13 @@ class AttentionExplainer(SaliencyExplainer):
     the attention aggregator (for example the CLS)
     """
 
-    aggregator_idx: int = 0  # corresponds to [CLS] in most tokenizations
+    aggregator_idx: Union[
+        int, str
+    ] = "mean"  # corresponds to [CLS] in most tokenizations
+    aggregator_dim: str = "row"
     layer_idx: int = -1  # layer from which to use attention from
     init_fn: Union[Callable, str] = "uniform"
+    normalize_head_coeffs: bool = False
 
     def prepare_init(self):
         """TODO: replace this with getter"""
@@ -25,6 +32,13 @@ class AttentionExplainer(SaliencyExplainer):
             return lambda _, shape: jnp.ones(shape) / shape[0]
         elif self.init_fn == "lecun_normal":
             return nn.initializers.lecun_normal()
+        elif self.init_fn[:5] == "head_":
+
+            def init(_, shape):
+                coefs = jnp.ones(shape) * -1e10
+                return coefs.at[int(self.init_fn[5:])].set(1.0)
+
+            return init
         else:
             return self.init_fn
 
@@ -42,7 +56,36 @@ class AttentionExplainer(SaliencyExplainer):
             init_fn,
             (head_attentions.shape[1],),
         )
+        if self.normalize_head_coeffs:
+            if self.normalize_head_coeffs == "sparsemax":
+                headcoeffs = sparsemax(headcoeffs)
+            elif self.normalize_head_coeffs == "entmax":
+                headcoeffs = entmax15(headcoeffs)
+            else:
+                headcoeffs = nn.softmax(headcoeffs)
 
-        return jnp.einsum(
-            "h,bht->bt", headcoeffs, head_attentions[:, :, self.aggregator_idx, :]
-        )
+        if isinstance(self.aggregator_idx, int):
+            if self.aggregator_dim == "row":
+                attentions = head_attentions[:, :, self.aggregator_idx, :]
+            elif self.aggregator_dim == "col":
+                attentions = head_attentions[:, :, :, self.aggregator_idx]
+            else:
+                raise ValueError("Unknown aggregator_dim")
+        elif self.aggregator_idx == "mean":
+            coeffs = jax.lax.select(
+                inputs["attention_mask"] > 0,
+                jnp.full(inputs["attention_mask"].shape, 1),
+                jnp.full(inputs["attention_mask"].shape, 0),
+            )
+            coeffs = coeffs / jnp.sum(coeffs, axis=-1, keepdims=True)
+            if self.aggregator_dim == "row":
+                attentions = jnp.einsum("bhcr,bc->bhr", head_attentions, coeffs)
+            if self.aggregator_dim == "col":
+                attentions = jnp.einsum("bhrc,bc->bhr", head_attentions, coeffs)
+        elif self.aggregator_idx == "debug_uniform":
+            attentions = jnp.ones_like(head_attentions)
+            attentions = attentions[:, :, :, 0]
+        else:
+            raise ValueError(f"Unsupported aggregator_idx: {self.aggregator_idx}")
+
+        return jnp.einsum("h,bht->bt", headcoeffs, attentions)
