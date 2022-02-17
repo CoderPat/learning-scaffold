@@ -2,7 +2,7 @@ import "submitters.tape"
 
 task TrainTeacher 
     > teacher_dir
-    :: .submitter=@ .mem=16000 .gres="gpu:1" .cpus=2 .time=0
+    :: .submitter=@ .mem=16000 .gres="gpu:1" .cpus=2 .time=0 .exclude=@
     :: repo=@
     :: task=@
     :: teacher_arch=@
