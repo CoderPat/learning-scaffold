@@ -30,7 +30,6 @@ class ScalarMix(nn.Module):
             ]
         )
         out = gamma * jnp.sum(weights[:, None, None] * means, axis=0)
-        print(out.shape)
         return out
 
 

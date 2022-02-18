@@ -5,6 +5,7 @@ from transformers.models.bert.modeling_flax_bert import (
     FlaxBertForSequenceClassificationModule,
 )
 
+from .scalar_mix import ScalarMix
 
 class BertModel(nn.Module):
     """A BERT-based classification module"""
@@ -29,7 +30,7 @@ class BertModel(nn.Module):
             attention_mask = jnp.ones_like(input_ids)
 
         bert_module = FlaxBertForSequenceClassificationModule(config=self.config)
-        outputs, hidden_states, attentions = bert_module(
+        _, hidden_states, attentions = bert_module(
             input_ids,
             attention_mask=attention_mask,
             token_type_ids=token_type_ids,
@@ -40,6 +41,10 @@ class BertModel(nn.Module):
             deterministic=deterministic,
             return_dict=False,
         )
+
+        outputs = ScalarMix()(hidden_states, attention_mask)
+        outputs = bert_module.classifier(outputs[:, None, :], deterministic=deterministic)
+
         state = {"hidden_states": hidden_states, "attentions": attentions}
         return outputs, state
 
