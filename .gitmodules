@@ -1,3 +1,3 @@
 [submodule "meta_expl/mlqe-pe"]
-	path = meta_expl/mlqe-pe
+	path = mlqe-pe
 	url = https://github.com/sheffieldnlp/mlqe-pe

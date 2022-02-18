@@ -13,7 +13,7 @@ def load_data(setup: str, split: str, seed: int = 0):
     dataset = []
     for langpair in langpairs:
         data = (
-            Path(__file__).parents[1]
+            Path(__file__).parents[2]
             / "mlqe-pe"
             / "data"
             / "direct-assessments"
