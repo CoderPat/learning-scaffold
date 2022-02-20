@@ -84,6 +84,8 @@ if __name__ == "__main__":
     parser.add_argument("--lp", type=str, default="ro-en")
     parser.add_argument("--max-len", type=int, default=256)
     parser.add_argument("--batch-size", type=int, default=16)
+    parser.add_argument("--num-layers", type=int, default=12)
+    parser.add_argument("--num-heads", type=int, default=12)
     parser.add_argument("--task-type", type=str, default="regression")
     parser.add_argument("--use-top-layer-head", action='store_true')
     args = parser.parse_args()
@@ -127,25 +129,28 @@ if __name__ == "__main__":
     teacher_explainer, teacher_explainer_params = load_explainer(explainer_dir, dummy_inputs, state=dummy_state)
 
     # auxiliary function to get the explanations
-    def get_explanations(data, use_top_layer_head=False):
+    def get_explanations(data, strategy='mtl', layer_id=0, head_id=0):
         all_tokens = []
         all_masks = []
         all_explanations = []
         all_outputs = []
         c = 1
         for x, y in dataloader(data, tokenizer, batch_size=batch_size, max_len=max_len, shuffle=False):
-            print("{} of {}".format(c, len(data) // batch_size + 1), end="\r")
+            print('{} of {}'.format(c, len(data) // batch_size + 1), end='\r')
             c += 1
-
+            
             # get teacher output
             y_teacher, teacher_attn = teacher.apply(teacher_params, **x, deterministic=True)
             if task_type == "classification":
                 y_teacher = jnp.argmax(y_teacher, axis=-1)
-
-            # get explanation from the teacher explainer
-            teacher_expl, _ = teacher_explainer.apply(teacher_explainer_params, x, teacher_attn)
-
-            if use_top_layer_head:
+            
+            # use the explanation given to the student by the teacher explainer
+            if strategy == 'mtl':
+                # get explanation from the teacher explainer
+                teacher_expl, _ = teacher_explainer.apply(teacher_explainer_params, x, teacher_attn)
+            
+            # use the explanation from the best head at the best layer (according to the coefficients)
+            elif strategy == 'top_layer_head':
                 # batch x layers x heads x seqlen x seqlen
                 all_attentions = jnp.stack(teacher_attn['attentions']).transpose([1, 0, 2, 3, 4])
                 num_layers = all_attentions.shape[1] 
@@ -160,7 +165,22 @@ if __name__ == "__main__":
                 mask = x['attention_mask']
                 teacher_expl = (attn * mask[:, :, None]).sum(-2) / mask.sum(-1)[:, None]
             
-            if False:
+            # average a specific layer
+            elif strategy == 'layer_average':
+                all_attentions = jnp.stack(teacher_attn['attentions']).transpose([1, 0, 2, 3, 4])
+                attn = all_attentions[:, layer_id].mean(1)
+                mask = x['attention_mask']
+                teacher_expl = (attn * mask[:, :, None]).sum(-2) / mask.sum(-1)[:, None]
+            
+            # use a specific head at a specific layer
+            elif strategy == 'layer_head':
+                all_attentions = jnp.stack(teacher_attn['attentions']).transpose([1, 0, 2, 3, 4])
+                attn = all_attentions[:, layer_id, head_id]
+                mask = x['attention_mask']
+                teacher_expl = (attn * mask[:, :, None]).sum(-2) / mask.sum(-1)[:, None]
+            
+            # return all nonzero attention explanations (not tested)
+            else:
                 # get all attentions from the teacher associated with nonzero head coeff
                 head_coeffs = head_coeffs.reshape(num_layers, num_heads)
                 nonzero_rows, nonzero_cols = head_coeffs.nonzero()
@@ -172,20 +192,20 @@ if __name__ == "__main__":
                 teacher_expl = (attn * mask[..., None]).sum(-2) / mask.sum(-1)[..., None]
 
             # convert everything to lists
-            batch_ids = x["input_ids"].tolist()
+            batch_ids = x['input_ids'].tolist()
             batch_tokens = [tokenizer.convert_ids_to_tokens(ids) for ids in batch_ids]
-            batch_masks = [[tk.startswith("▁") for tk in tokens] for tokens in batch_tokens]
+            batch_masks = [[tk.startswith('▁') for tk in tokens] for tokens in batch_tokens]
             batch_expls = teacher_expl.tolist()
-
+            
             # filter out pad
-            batch_valid_len = x["attention_mask"].sum(-1).tolist()
+            batch_valid_len = x['attention_mask'].sum(-1).tolist()
             for i in range(len(batch_valid_len)):
                 n = batch_valid_len[i]
                 batch_ids[i] = batch_ids[i][:n]
                 batch_tokens[i] = batch_tokens[i][:n]
                 batch_masks[i] = batch_masks[i][:n]
                 batch_expls[i] = batch_expls[i][:n]
-
+            
             all_tokens.extend(batch_tokens)
             all_masks.extend(batch_masks)
             all_explanations.extend(batch_expls)
@@ -216,9 +236,39 @@ if __name__ == "__main__":
     pred_expls_mt = mt_expls
     pred_scores = unroll(valid_outputs)
 
+    print('USING META-LEARNED COEFFS:')
     print("Sentence-level results:")
     evaluate_sentence_level(gold_scores, pred_scores)
     print("Word-level SRC results:")
     evaluate_word_level(gold_expls_src, pred_expls_src)
     print("Word-level MT results:")
     evaluate_word_level(gold_expls_mt, pred_expls_mt)
+
+    print('Calculating plausiblity scores for all layers (VERY SLOW)...')
+    for layer_id in range(args.num_layers):
+        valid_tokens, valid_masks, valid_explanations, valid_outputs = get_explanations(
+            valid_data, strategy='layer_average', layer_id=layer_id
+        )
+        src_expls, mt_expls, src_pieces, mt_pieces = get_src_and_mt_explanations(
+            valid_tokens, valid_masks, valid_explanations, reduction=reduction
+        )
+        print('LAYER: {}'.format(layer_id))
+        _ = evaluate_word_level(gold_expls_src, src_expls)
+        _ = evaluate_word_level(gold_expls_mt, mt_expls)
+        print('---')
+
+
+    print('Calculating plausiblity scores for all heads in all layers (EXTREMELLY SLOW)...')
+    for layer_id in range(12):
+        for head_id in range(12):
+            valid_tokens, valid_masks, valid_explanations, valid_outputs = get_explanations(
+                valid_data, strategy='layer_head', layer_id=layer_id, head_id=head_id
+            )
+            src_expls, mt_expls, src_pieces, mt_pieces = get_src_and_mt_explanations(
+                valid_tokens, valid_masks, valid_explanations, reduction=reduction
+            )
+            print('LAYER: {} | HEAD: {}'.format(layer_id, head_id))
+            _ = evaluate_word_level(gold_expls_src, src_expls)
+            _ = evaluate_word_level(gold_expls_mt, mt_expls)
+            print('---')
+
