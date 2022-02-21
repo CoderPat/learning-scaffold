@@ -7,9 +7,12 @@ from numpy import random
 from transformers import PreTrainedTokenizerFast
 
 
-def load_data(setup: str, split: str, seed: int = 0):
+def load_data(setup: str, split: str, seed: int = 0, eval_lp=None):
     split_n = "dev" if split == "valid" else split
-    langpairs = ["en-de", "en-zh", "et-en", "ne-en", "ro-en", "ru-en"]
+    if eval_lp is not None and split in ['valid', 'test']:
+        langpairs = [eval_lp]
+    else:
+        langpairs = ["en-de", "en-zh", "et-en", "ne-en", "ro-en", "ru-en"]
     dataset = []
     for langpair in langpairs:
         data = (

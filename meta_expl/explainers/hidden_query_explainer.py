@@ -13,6 +13,7 @@ class HiddenQKExplainer(SaliencyExplainer):
     """
 
     layer_idx: int = 0  # layer from which to use attention from
+    head_idx: int = None  # head from which to use attention from
     kq_dim: int = 1028
 
     def logit_computation(self, inputs, state):
@@ -26,4 +27,6 @@ class HiddenQKExplainer(SaliencyExplainer):
 
         keys = nn.Dense(self.kq_dim)(hidden_states)
         logits = jnp.squeeze(nn.Dense(1, use_bias=False)(keys) / keys.shape[-1] ** 0.5)
+        if self.head_idx is not None:
+            return logits[:, self.head_idx][:, None] + bias
         return logits + bias

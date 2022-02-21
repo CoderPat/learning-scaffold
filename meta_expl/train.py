@@ -443,9 +443,7 @@ def eval_step(model, criterion, params, x, y):
     return loss, outputs
 
 
-def main():
-    args = read_args()
-
+def main(args):
     keyseq = PRNGSequence(args.seed)
     np.random.seed(args.seed)
 
@@ -838,4 +836,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    args = read_args()
+    main(args)

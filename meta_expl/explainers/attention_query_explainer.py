@@ -20,6 +20,7 @@ class AttentionQueryExplainer(SaliencyExplainer):
     """
 
     layer_idx: int = -1  # layer from which to use attention from
+    head_idx: int = None  # head from which to use attention from
     kq_dim: int = 1024
     init_fn: Union[Callable, str] = "uniform"
     parametrize_head_coeffs: bool = True
@@ -81,5 +82,8 @@ class AttentionQueryExplainer(SaliencyExplainer):
             )
         else:
             raise NotImplementedError(f"Unknown aggregator_dim: {self.aggregator_dim}")
+
+        if self.head_idx is not None:
+            return combined_attentions[:, self.head_idx]
 
         return jnp.einsum("h,bht->bt", headcoeffs, combined_attentions)

@@ -23,6 +23,7 @@ class AttentionExplainer(SaliencyExplainer):
     ] = "mean"  # corresponds to [CLS] in most tokenizations
     aggregator_dim: str = "row"
     layer_idx: int = -1  # layer from which to use attention from
+    head_idx: int = None  # head from which to use attention from
     init_fn: Union[Callable, str] = "uniform"
     normalize_head_coeffs: bool = False
 
@@ -87,5 +88,8 @@ class AttentionExplainer(SaliencyExplainer):
             attentions = attentions[:, :, :, 0]
         else:
             raise ValueError(f"Unsupported aggregator_idx: {self.aggregator_idx}")
-
+        
+        if self.head_idx is not None:
+            return attentions[:, self.head_idx]
+        
         return jnp.einsum("h,bht->bt", headcoeffs, attentions)

@@ -1,0 +1,1263 @@
+Pearson: 0.7901
+Spearman: 0.7382
+MAE: 0.5354
+RMSE: 0.6634
+AUC score: 0.6809
+AP score: 0.5430
+Recall at top-K: 0.4113
+AUC score: 0.6689
+AP score: 0.5506
+Recall at top-K: 0.4207
+
+
+LAYER: 0
+AUC score: 0.5208
+AP score: 0.4025
+Recall at top-K: 0.2837
+AUC score: 0.4641
+AP score: 0.3456
+Recall at top-K: 0.2371
+---
+LAYER: 1
+AUC score: 0.4518
+AP score: 0.3955
+Recall at top-K: 0.2847
+AUC score: 0.4131
+AP score: 0.3346
+Recall at top-K: 0.2281
+---
+LAYER: 2
+AUC score: 0.4369
+AP score: 0.3888
+Recall at top-K: 0.2769
+AUC score: 0.4563
+AP score: 0.3546
+Recall at top-K: 0.2411
+---
+LAYER: 3
+AUC score: 0.3928
+AP score: 0.3762
+Recall at top-K: 0.2637
+AUC score: 0.4114
+AP score: 0.3345
+Recall at top-K: 0.2260
+---
+LAYER: 4
+AUC score: 0.4913
+AP score: 0.4166
+Recall at top-K: 0.3112
+AUC score: 0.5232
+AP score: 0.4125
+Recall at top-K: 0.3057
+---
+LAYER: 5
+AUC score: 0.4199
+AP score: 0.3747
+Recall at top-K: 0.2613
+AUC score: 0.4729
+AP score: 0.3687
+Recall at top-K: 0.2630
+---
+LAYER: 6
+AUC score: 0.4209
+AP score: 0.3853
+Recall at top-K: 0.2760
+AUC score: 0.5519
+AP score: 0.4340
+Recall at top-K: 0.3232
+---
+LAYER: 7
+AUC score: 0.4005
+AP score: 0.3395
+Recall at top-K: 0.2294
+AUC score: 0.5186
+AP score: 0.4102
+Recall at top-K: 0.3095
+---
+LAYER: 8
+AUC score: 0.4158
+AP score: 0.3527
+Recall at top-K: 0.2434
+AUC score: 0.5282
+AP score: 0.4214
+Recall at top-K: 0.3179
+---
+LAYER: 9
+AUC score: 0.5166
+AP score: 0.4344
+Recall at top-K: 0.3266
+AUC score: 0.6214
+AP score: 0.5110
+Recall at top-K: 0.4038
+---
+LAYER: 10
+AUC score: 0.7094
+AP score: 0.5770
+Recall at top-K: 0.4538
+AUC score: 0.7048
+AP score: 0.5613
+Recall at top-K: 0.4350
+---
+LAYER: 11
+AUC score: 0.5090
+AP score: 0.3972
+Recall at top-K: 0.2795
+AUC score: 0.5216
+AP score: 0.3773
+Recall at top-K: 0.2595
+---
+
+
+
+LAYER: 0 | HEAD: 0
+AUC score: 0.3993
+AP score: 0.3212
+Recall at top-K: 0.2122
+AUC score: 0.3565
+AP score: 0.2766
+Recall at top-K: 0.1685
+---
+LAYER: 0 | HEAD: 1
+AUC score: 0.4253
+AP score: 0.3263
+Recall at top-K: 0.2187
+AUC score: 0.3665
+AP score: 0.2822
+Recall at top-K: 0.1757
+---
+LAYER: 0 | HEAD: 2
+AUC score: 0.3645
+AP score: 0.2878
+Recall at top-K: 0.1916
+AUC score: 0.4039
+AP score: 0.2976
+Recall at top-K: 0.1908
+---
+LAYER: 0 | HEAD: 3
+AUC score: 0.5239
+AP score: 0.4081
+Recall at top-K: 0.2914
+AUC score: 0.4962
+AP score: 0.3773
+Recall at top-K: 0.2637
+---
+LAYER: 0 | HEAD: 4
+AUC score: 0.4953
+AP score: 0.3662
+Recall at top-K: 0.2576
+AUC score: 0.4656
+AP score: 0.3227
+Recall at top-K: 0.2159
+---
+LAYER: 0 | HEAD: 5
+AUC score: 0.6679
+AP score: 0.5283
+Recall at top-K: 0.4047
+AUC score: 0.6397
+AP score: 0.4982
+Recall at top-K: 0.3690
+---
+LAYER: 0 | HEAD: 6
+AUC score: 0.5444
+AP score: 0.4150
+Recall at top-K: 0.2935
+AUC score: 0.5033
+AP score: 0.3572
+Recall at top-K: 0.2343
+---
+LAYER: 0 | HEAD: 7
+AUC score: 0.4187
+AP score: 0.3481
+Recall at top-K: 0.2343
+AUC score: 0.3677
+AP score: 0.2976
+Recall at top-K: 0.1892
+---
+LAYER: 0 | HEAD: 8
+AUC score: 0.4256
+AP score: 0.3128
+Recall at top-K: 0.2049
+AUC score: 0.3801
+AP score: 0.2882
+Recall at top-K: 0.1873
+---
+LAYER: 0 | HEAD: 9
+AUC score: 0.6427
+AP score: 0.4979
+Recall at top-K: 0.3760
+AUC score: 0.6350
+AP score: 0.4843
+Recall at top-K: 0.3692
+---
+LAYER: 0 | HEAD: 10
+AUC score: 0.4481
+AP score: 0.3224
+Recall at top-K: 0.2190
+AUC score: 0.3918
+AP score: 0.2926
+Recall at top-K: 0.1874
+---
+LAYER: 0 | HEAD: 11
+AUC score: 0.5230
+AP score: 0.4110
+Recall at top-K: 0.2959
+AUC score: 0.4855
+AP score: 0.3818
+Recall at top-K: 0.2606
+---
+LAYER: 1 | HEAD: 0
+AUC score: 0.5086
+AP score: 0.4158
+Recall at top-K: 0.3034
+AUC score: 0.4928
+AP score: 0.3783
+Recall at top-K: 0.2660
+---
+LAYER: 1 | HEAD: 1
+AUC score: 0.3479
+AP score: 0.3199
+Recall at top-K: 0.2122
+AUC score: 0.3280
+AP score: 0.2845
+Recall at top-K: 0.1835
+---
+LAYER: 1 | HEAD: 2
+AUC score: 0.3475
+AP score: 0.3158
+Recall at top-K: 0.2101
+AUC score: 0.3459
+AP score: 0.2953
+Recall at top-K: 0.1886
+---
+LAYER: 1 | HEAD: 3
+AUC score: 0.5640
+AP score: 0.4426
+Recall at top-K: 0.3263
+AUC score: 0.5403
+AP score: 0.4134
+Recall at top-K: 0.3013
+---
+LAYER: 1 | HEAD: 4
+AUC score: 0.4488
+AP score: 0.3894
+Recall at top-K: 0.2693
+AUC score: 0.4316
+AP score: 0.3513
+Recall at top-K: 0.2499
+---
+LAYER: 1 | HEAD: 5
+AUC score: 0.3767
+AP score: 0.3466
+Recall at top-K: 0.2327
+AUC score: 0.3254
+AP score: 0.2786
+Recall at top-K: 0.1723
+---
+LAYER: 1 | HEAD: 6
+AUC score: 0.4567
+AP score: 0.3622
+Recall at top-K: 0.2554
+AUC score: 0.3985
+AP score: 0.3185
+Recall at top-K: 0.2121
+---
+LAYER: 1 | HEAD: 7
+AUC score: 0.4807
+AP score: 0.4056
+Recall at top-K: 0.2900
+AUC score: 0.4724
+AP score: 0.3708
+Recall at top-K: 0.2634
+---
+LAYER: 1 | HEAD: 8
+AUC score: 0.5618
+AP score: 0.4385
+Recall at top-K: 0.3189
+AUC score: 0.5485
+AP score: 0.4078
+Recall at top-K: 0.2928
+---
+LAYER: 1 | HEAD: 9
+AUC score: 0.3441
+AP score: 0.3194
+Recall at top-K: 0.2095
+AUC score: 0.3017
+AP score: 0.2620
+Recall at top-K: 0.1639
+---
+LAYER: 1 | HEAD: 10
+AUC score: 0.6784
+AP score: 0.5081
+Recall at top-K: 0.3823
+AUC score: 0.6611
+AP score: 0.5105
+Recall at top-K: 0.3851
+---
+LAYER: 1 | HEAD: 11
+AUC score: 0.4706
+AP score: 0.3932
+Recall at top-K: 0.2757
+AUC score: 0.3568
+AP score: 0.2892
+Recall at top-K: 0.1853
+---
+LAYER: 2 | HEAD: 0
+AUC score: 0.6243
+AP score: 0.4786
+Recall at top-K: 0.3569
+AUC score: 0.5443
+AP score: 0.4177
+Recall at top-K: 0.3019
+---
+LAYER: 2 | HEAD: 1
+AUC score: 0.4249
+AP score: 0.3839
+Recall at top-K: 0.2775
+AUC score: 0.4559
+AP score: 0.3560
+Recall at top-K: 0.2463
+---
+LAYER: 2 | HEAD: 2
+AUC score: 0.4721
+AP score: 0.4027
+Recall at top-K: 0.2924
+AUC score: 0.4804
+AP score: 0.3533
+Recall at top-K: 0.2464
+---
+LAYER: 2 | HEAD: 3
+AUC score: 0.4960
+AP score: 0.4088
+Recall at top-K: 0.2913
+AUC score: 0.5634
+AP score: 0.4293
+Recall at top-K: 0.3104
+---
+LAYER: 2 | HEAD: 4
+AUC score: 0.4164
+AP score: 0.3820
+Recall at top-K: 0.2719
+AUC score: 0.4527
+AP score: 0.3535
+Recall at top-K: 0.2492
+---
+LAYER: 2 | HEAD: 5
+AUC score: 0.4933
+AP score: 0.4010
+Recall at top-K: 0.2890
+AUC score: 0.5176
+AP score: 0.3821
+Recall at top-K: 0.2681
+---
+LAYER: 2 | HEAD: 6
+AUC score: 0.3982
+AP score: 0.3786
+Recall at top-K: 0.2719
+AUC score: 0.4295
+AP score: 0.3480
+Recall at top-K: 0.2401
+---
+LAYER: 2 | HEAD: 7
+AUC score: 0.5393
+AP score: 0.4394
+Recall at top-K: 0.3277
+AUC score: 0.5077
+AP score: 0.3776
+Recall at top-K: 0.2690
+---
+LAYER: 2 | HEAD: 8
+AUC score: 0.4397
+AP score: 0.3785
+Recall at top-K: 0.2634
+AUC score: 0.3385
+AP score: 0.2708
+Recall at top-K: 0.1715
+---
+LAYER: 2 | HEAD: 9
+AUC score: 0.6098
+AP score: 0.4466
+Recall at top-K: 0.3222
+AUC score: 0.5262
+AP score: 0.3656
+Recall at top-K: 0.2456
+---
+LAYER: 2 | HEAD: 10
+AUC score: 0.6113
+AP score: 0.4662
+Recall at top-K: 0.3469
+AUC score: 0.5153
+AP score: 0.3827
+Recall at top-K: 0.2719
+---
+LAYER: 2 | HEAD: 11
+AUC score: 0.4861
+AP score: 0.3990
+Recall at top-K: 0.2811
+AUC score: 0.4029
+AP score: 0.3007
+Recall at top-K: 0.1945
+---
+LAYER: 3 | HEAD: 0
+AUC score: 0.3706
+AP score: 0.3342
+Recall at top-K: 0.2222
+AUC score: 0.4301
+AP score: 0.3355
+Recall at top-K: 0.2304
+---
+LAYER: 3 | HEAD: 1
+AUC score: 0.6767
+AP score: 0.5224
+Recall at top-K: 0.4013
+AUC score: 0.6356
+AP score: 0.4804
+Recall at top-K: 0.3552
+---
+LAYER: 3 | HEAD: 2
+AUC score: 0.4484
+AP score: 0.3834
+Recall at top-K: 0.2626
+AUC score: 0.3670
+AP score: 0.2843
+Recall at top-K: 0.1785
+---
+LAYER: 3 | HEAD: 3
+AUC score: 0.4010
+AP score: 0.3533
+Recall at top-K: 0.2360
+AUC score: 0.4472
+AP score: 0.3391
+Recall at top-K: 0.2336
+---
+LAYER: 3 | HEAD: 4
+AUC score: 0.4573
+AP score: 0.3876
+Recall at top-K: 0.2674
+AUC score: 0.3838
+AP score: 0.2998
+Recall at top-K: 0.1908
+---
+LAYER: 3 | HEAD: 5
+AUC score: 0.5016
+AP score: 0.4075
+Recall at top-K: 0.2907
+AUC score: 0.4237
+AP score: 0.3217
+Recall at top-K: 0.2074
+---
+LAYER: 3 | HEAD: 6
+AUC score: 0.6328
+AP score: 0.4770
+Recall at top-K: 0.3590
+AUC score: 0.5587
+AP score: 0.4007
+Recall at top-K: 0.2766
+---
+LAYER: 3 | HEAD: 7
+AUC score: 0.6946
+AP score: 0.5230
+Recall at top-K: 0.3994
+AUC score: 0.7128
+AP score: 0.5491
+Recall at top-K: 0.4250
+---
+LAYER: 3 | HEAD: 8
+AUC score: 0.3865
+AP score: 0.3448
+Recall at top-K: 0.2321
+AUC score: 0.4413
+AP score: 0.3382
+Recall at top-K: 0.2236
+---
+LAYER: 3 | HEAD: 9
+AUC score: 0.4223
+AP score: 0.3626
+Recall at top-K: 0.2542
+AUC score: 0.5039
+AP score: 0.3882
+Recall at top-K: 0.2700
+---
+LAYER: 3 | HEAD: 10
+AUC score: 0.3566
+AP score: 0.3518
+Recall at top-K: 0.2447
+AUC score: 0.2890
+AP score: 0.2611
+Recall at top-K: 0.1557
+---
+LAYER: 3 | HEAD: 11
+AUC score: 0.4621
+AP score: 0.3868
+Recall at top-K: 0.2722
+AUC score: 0.4022
+AP score: 0.2948
+Recall at top-K: 0.1867
+---
+LAYER: 4 | HEAD: 0
+AUC score: 0.4734
+AP score: 0.4116
+Recall at top-K: 0.3002
+AUC score: 0.4903
+AP score: 0.3783
+Recall at top-K: 0.2714
+---
+LAYER: 4 | HEAD: 1
+AUC score: 0.4365
+AP score: 0.3768
+Recall at top-K: 0.2626
+AUC score: 0.5219
+AP score: 0.4008
+Recall at top-K: 0.2889
+---
+LAYER: 4 | HEAD: 2
+AUC score: 0.3957
+AP score: 0.3514
+Recall at top-K: 0.2386
+AUC score: 0.4510
+AP score: 0.3451
+Recall at top-K: 0.2395
+---
+LAYER: 4 | HEAD: 3
+AUC score: 0.4868
+AP score: 0.4119
+Recall at top-K: 0.3006
+AUC score: 0.4073
+AP score: 0.3338
+Recall at top-K: 0.2280
+---
+LAYER: 4 | HEAD: 4
+AUC score: 0.6933
+AP score: 0.5406
+Recall at top-K: 0.4234
+AUC score: 0.6445
+AP score: 0.4997
+Recall at top-K: 0.3750
+---
+LAYER: 4 | HEAD: 5
+AUC score: 0.3954
+AP score: 0.3722
+Recall at top-K: 0.2603
+AUC score: 0.3750
+AP score: 0.2996
+Recall at top-K: 0.1892
+---
+LAYER: 4 | HEAD: 6
+AUC score: 0.7115
+AP score: 0.5496
+Recall at top-K: 0.4322
+AUC score: 0.6787
+AP score: 0.5321
+Recall at top-K: 0.4222
+---
+LAYER: 4 | HEAD: 7
+AUC score: 0.5091
+AP score: 0.4244
+Recall at top-K: 0.3118
+AUC score: 0.4945
+AP score: 0.3848
+Recall at top-K: 0.2795
+---
+LAYER: 4 | HEAD: 8
+AUC score: 0.7055
+AP score: 0.5592
+Recall at top-K: 0.4376
+AUC score: 0.6427
+AP score: 0.5030
+Recall at top-K: 0.3724
+---
+LAYER: 4 | HEAD: 9
+AUC score: 0.3760
+AP score: 0.3362
+Recall at top-K: 0.2276
+AUC score: 0.4611
+AP score: 0.3712
+Recall at top-K: 0.2615
+---
+LAYER: 4 | HEAD: 10
+AUC score: 0.5412
+AP score: 0.3778
+Recall at top-K: 0.2696
+AUC score: 0.5233
+AP score: 0.3581
+Recall at top-K: 0.2524
+---
+LAYER: 4 | HEAD: 11
+AUC score: 0.5690
+AP score: 0.4556
+Recall at top-K: 0.3469
+AUC score: 0.5520
+AP score: 0.4312
+Recall at top-K: 0.3146
+---
+LAYER: 5 | HEAD: 0
+AUC score: 0.3887
+AP score: 0.3348
+Recall at top-K: 0.2274
+AUC score: 0.4887
+AP score: 0.3726
+Recall at top-K: 0.2645
+---
+LAYER: 5 | HEAD: 1
+AUC score: 0.4947
+AP score: 0.4052
+Recall at top-K: 0.2888
+AUC score: 0.5420
+AP score: 0.4105
+Recall at top-K: 0.2916
+---
+LAYER: 5 | HEAD: 2
+AUC score: 0.3834
+AP score: 0.3476
+Recall at top-K: 0.2327
+AUC score: 0.4142
+AP score: 0.3405
+Recall at top-K: 0.2405
+---
+LAYER: 5 | HEAD: 3
+AUC score: 0.4782
+AP score: 0.4080
+Recall at top-K: 0.2995
+AUC score: 0.3943
+AP score: 0.3203
+Recall at top-K: 0.2155
+---
+LAYER: 5 | HEAD: 4
+AUC score: 0.4937
+AP score: 0.4132
+Recall at top-K: 0.2984
+AUC score: 0.4647
+AP score: 0.3625
+Recall at top-K: 0.2493
+---
+LAYER: 5 | HEAD: 5
+AUC score: 0.3649
+AP score: 0.3198
+Recall at top-K: 0.2078
+AUC score: 0.4546
+AP score: 0.3496
+Recall at top-K: 0.2414
+---
+LAYER: 5 | HEAD: 6
+AUC score: 0.3634
+AP score: 0.3277
+Recall at top-K: 0.2212
+AUC score: 0.2886
+AP score: 0.2527
+Recall at top-K: 0.1481
+---
+LAYER: 5 | HEAD: 7
+AUC score: 0.6270
+AP score: 0.4885
+Recall at top-K: 0.3780
+AUC score: 0.6813
+AP score: 0.5346
+Recall at top-K: 0.4147
+---
+LAYER: 5 | HEAD: 8
+AUC score: 0.4677
+AP score: 0.3839
+Recall at top-K: 0.2760
+AUC score: 0.5210
+AP score: 0.3873
+Recall at top-K: 0.2733
+---
+LAYER: 5 | HEAD: 9
+AUC score: 0.4322
+AP score: 0.3669
+Recall at top-K: 0.2523
+AUC score: 0.4847
+AP score: 0.3628
+Recall at top-K: 0.2501
+---
+LAYER: 5 | HEAD: 10
+AUC score: 0.5581
+AP score: 0.4588
+Recall at top-K: 0.3445
+AUC score: 0.5381
+AP score: 0.4286
+Recall at top-K: 0.3132
+---
+LAYER: 5 | HEAD: 11
+AUC score: 0.3811
+AP score: 0.3353
+Recall at top-K: 0.2241
+AUC score: 0.4586
+AP score: 0.3491
+Recall at top-K: 0.2420
+---
+LAYER: 6 | HEAD: 0
+AUC score: 0.5028
+AP score: 0.4195
+Recall at top-K: 0.3106
+AUC score: 0.6566
+AP score: 0.5009
+Recall at top-K: 0.3858
+---
+LAYER: 6 | HEAD: 1
+AUC score: 0.3618
+AP score: 0.3211
+Recall at top-K: 0.2111
+AUC score: 0.4677
+AP score: 0.3677
+Recall at top-K: 0.2579
+---
+LAYER: 6 | HEAD: 2
+AUC score: 0.4187
+AP score: 0.3775
+Recall at top-K: 0.2615
+AUC score: 0.5096
+AP score: 0.4178
+Recall at top-K: 0.3074
+---
+LAYER: 6 | HEAD: 3
+AUC score: 0.4362
+AP score: 0.3660
+Recall at top-K: 0.2501
+AUC score: 0.5894
+AP score: 0.4443
+Recall at top-K: 0.3233
+---
+LAYER: 6 | HEAD: 4
+AUC score: 0.3650
+AP score: 0.3222
+Recall at top-K: 0.2099
+AUC score: 0.4669
+AP score: 0.3705
+Recall at top-K: 0.2666
+---
+LAYER: 6 | HEAD: 5
+AUC score: 0.5344
+AP score: 0.4415
+Recall at top-K: 0.3308
+AUC score: 0.6964
+AP score: 0.5687
+Recall at top-K: 0.4528
+---
+LAYER: 6 | HEAD: 6
+AUC score: 0.3986
+AP score: 0.3455
+Recall at top-K: 0.2342
+AUC score: 0.4476
+AP score: 0.3612
+Recall at top-K: 0.2537
+---
+LAYER: 6 | HEAD: 7
+AUC score: 0.4329
+AP score: 0.3658
+Recall at top-K: 0.2510
+AUC score: 0.5627
+AP score: 0.4375
+Recall at top-K: 0.3293
+---
+LAYER: 6 | HEAD: 8
+AUC score: 0.6285
+AP score: 0.5014
+Recall at top-K: 0.3790
+AUC score: 0.7099
+AP score: 0.5707
+Recall at top-K: 0.4444
+---
+LAYER: 6 | HEAD: 9
+AUC score: 0.4840
+AP score: 0.4171
+Recall at top-K: 0.3094
+AUC score: 0.5730
+AP score: 0.4532
+Recall at top-K: 0.3417
+---
+LAYER: 6 | HEAD: 10
+AUC score: 0.4528
+AP score: 0.3860
+Recall at top-K: 0.2778
+AUC score: 0.6433
+AP score: 0.4882
+Recall at top-K: 0.3643
+---
+LAYER: 6 | HEAD: 11
+AUC score: 0.3949
+AP score: 0.3526
+Recall at top-K: 0.2423
+AUC score: 0.4710
+AP score: 0.3646
+Recall at top-K: 0.2570
+---
+LAYER: 7 | HEAD: 0
+AUC score: 0.5555
+AP score: 0.4659
+Recall at top-K: 0.3519
+AUC score: 0.5565
+AP score: 0.4381
+Recall at top-K: 0.3295
+---
+LAYER: 7 | HEAD: 1
+AUC score: 0.3580
+AP score: 0.3135
+Recall at top-K: 0.2023
+AUC score: 0.4760
+AP score: 0.3821
+Recall at top-K: 0.2737
+---
+LAYER: 7 | HEAD: 2
+AUC score: 0.3954
+AP score: 0.3264
+Recall at top-K: 0.2141
+AUC score: 0.4973
+AP score: 0.3870
+Recall at top-K: 0.2784
+---
+LAYER: 7 | HEAD: 3
+AUC score: 0.3556
+AP score: 0.3114
+Recall at top-K: 0.1952
+AUC score: 0.4705
+AP score: 0.3651
+Recall at top-K: 0.2581
+---
+LAYER: 7 | HEAD: 4
+AUC score: 0.3789
+AP score: 0.3278
+Recall at top-K: 0.2187
+AUC score: 0.5229
+AP score: 0.4108
+Recall at top-K: 0.3015
+---
+LAYER: 7 | HEAD: 5
+AUC score: 0.4222
+AP score: 0.3573
+Recall at top-K: 0.2527
+AUC score: 0.5523
+AP score: 0.4318
+Recall at top-K: 0.3132
+---
+LAYER: 7 | HEAD: 6
+AUC score: 0.4025
+AP score: 0.3412
+Recall at top-K: 0.2285
+AUC score: 0.4991
+AP score: 0.3889
+Recall at top-K: 0.2818
+---
+LAYER: 7 | HEAD: 7
+AUC score: 0.3969
+AP score: 0.3340
+Recall at top-K: 0.2250
+AUC score: 0.5237
+AP score: 0.4128
+Recall at top-K: 0.3088
+---
+LAYER: 7 | HEAD: 8
+AUC score: 0.5153
+AP score: 0.3988
+Recall at top-K: 0.2824
+AUC score: 0.6571
+AP score: 0.5080
+Recall at top-K: 0.3903
+---
+LAYER: 7 | HEAD: 9
+AUC score: 0.5943
+AP score: 0.4767
+Recall at top-K: 0.3650
+AUC score: 0.7447
+AP score: 0.6104
+Recall at top-K: 0.4864
+---
+LAYER: 7 | HEAD: 10
+AUC score: 0.3967
+AP score: 0.3377
+Recall at top-K: 0.2306
+AUC score: 0.5138
+AP score: 0.3985
+Recall at top-K: 0.2935
+---
+LAYER: 7 | HEAD: 11
+AUC score: 0.3934
+AP score: 0.3328
+Recall at top-K: 0.2151
+AUC score: 0.5113
+AP score: 0.4026
+Recall at top-K: 0.2954
+---
+LAYER: 8 | HEAD: 0
+AUC score: 0.3853
+AP score: 0.3394
+Recall at top-K: 0.2302
+AUC score: 0.4819
+AP score: 0.3954
+Recall at top-K: 0.2895
+---
+LAYER: 8 | HEAD: 1
+AUC score: 0.3810
+AP score: 0.3302
+Recall at top-K: 0.2221
+AUC score: 0.4704
+AP score: 0.3636
+Recall at top-K: 0.2515
+---
+LAYER: 8 | HEAD: 2
+AUC score: 0.4217
+AP score: 0.3485
+Recall at top-K: 0.2410
+AUC score: 0.5213
+AP score: 0.4007
+Recall at top-K: 0.2992
+---
+LAYER: 8 | HEAD: 3
+AUC score: 0.3890
+AP score: 0.3415
+Recall at top-K: 0.2295
+AUC score: 0.4760
+AP score: 0.3790
+Recall at top-K: 0.2703
+---
+LAYER: 8 | HEAD: 4
+AUC score: 0.4407
+AP score: 0.3594
+Recall at top-K: 0.2471
+AUC score: 0.5370
+AP score: 0.4071
+Recall at top-K: 0.2910
+---
+LAYER: 8 | HEAD: 5
+AUC score: 0.5750
+AP score: 0.4669
+Recall at top-K: 0.3534
+AUC score: 0.6789
+AP score: 0.5446
+Recall at top-K: 0.4205
+---
+LAYER: 8 | HEAD: 6
+AUC score: 0.4029
+AP score: 0.3454
+Recall at top-K: 0.2318
+AUC score: 0.4553
+AP score: 0.3549
+Recall at top-K: 0.2422
+---
+LAYER: 8 | HEAD: 7
+AUC score: 0.4812
+AP score: 0.3872
+Recall at top-K: 0.2812
+AUC score: 0.6058
+AP score: 0.4670
+Recall at top-K: 0.3500
+---
+LAYER: 8 | HEAD: 8
+AUC score: 0.4815
+AP score: 0.3989
+Recall at top-K: 0.2868
+AUC score: 0.5846
+AP score: 0.4725
+Recall at top-K: 0.3639
+---
+LAYER: 8 | HEAD: 9
+AUC score: 0.3700
+AP score: 0.3193
+Recall at top-K: 0.2086
+AUC score: 0.4899
+AP score: 0.3904
+Recall at top-K: 0.2863
+---
+LAYER: 8 | HEAD: 10
+AUC score: 0.3779
+AP score: 0.3251
+Recall at top-K: 0.2217
+AUC score: 0.4790
+AP score: 0.3715
+Recall at top-K: 0.2606
+---
+LAYER: 8 | HEAD: 11
+AUC score: 0.3932
+AP score: 0.3392
+Recall at top-K: 0.2309
+AUC score: 0.4954
+AP score: 0.3961
+Recall at top-K: 0.2967
+---
+LAYER: 9 | HEAD: 0
+AUC score: 0.4831
+AP score: 0.4087
+Recall at top-K: 0.2998
+AUC score: 0.5529
+AP score: 0.4473
+Recall at top-K: 0.3385
+---
+LAYER: 9 | HEAD: 1
+AUC score: 0.4547
+AP score: 0.3848
+Recall at top-K: 0.2691
+AUC score: 0.5317
+AP score: 0.4180
+Recall at top-K: 0.3134
+---
+LAYER: 9 | HEAD: 2
+AUC score: 0.4003
+AP score: 0.3553
+Recall at top-K: 0.2460
+AUC score: 0.5148
+AP score: 0.4269
+Recall at top-K: 0.3269
+---
+LAYER: 9 | HEAD: 3
+AUC score: 0.5567
+AP score: 0.4411
+Recall at top-K: 0.3267
+AUC score: 0.6690
+AP score: 0.5310
+Recall at top-K: 0.4104
+---
+LAYER: 9 | HEAD: 4
+AUC score: 0.5028
+AP score: 0.4203
+Recall at top-K: 0.3023
+AUC score: 0.5600
+AP score: 0.4531
+Recall at top-K: 0.3435
+---
+LAYER: 9 | HEAD: 5
+AUC score: 0.7237
+AP score: 0.6055
+Recall at top-K: 0.4929
+AUC score: 0.7159
+AP score: 0.5837
+Recall at top-K: 0.4584
+---
+LAYER: 9 | HEAD: 6
+AUC score: 0.4196
+AP score: 0.3728
+Recall at top-K: 0.2603
+AUC score: 0.5150
+AP score: 0.4367
+Recall at top-K: 0.3409
+---
+LAYER: 9 | HEAD: 7
+AUC score: 0.5338
+AP score: 0.4419
+Recall at top-K: 0.3384
+AUC score: 0.5982
+AP score: 0.4853
+Recall at top-K: 0.3719
+---
+LAYER: 9 | HEAD: 8
+AUC score: 0.5676
+AP score: 0.4559
+Recall at top-K: 0.3424
+AUC score: 0.6769
+AP score: 0.5525
+Recall at top-K: 0.4410
+---
+LAYER: 9 | HEAD: 9
+AUC score: 0.5930
+AP score: 0.4723
+Recall at top-K: 0.3575
+AUC score: 0.6773
+AP score: 0.5391
+Recall at top-K: 0.4243
+---
+LAYER: 9 | HEAD: 10
+AUC score: 0.4266
+AP score: 0.3628
+Recall at top-K: 0.2523
+AUC score: 0.4460
+AP score: 0.3600
+Recall at top-K: 0.2538
+---
+LAYER: 9 | HEAD: 11
+AUC score: 0.4932
+AP score: 0.4198
+Recall at top-K: 0.3156
+AUC score: 0.5823
+AP score: 0.4780
+Recall at top-K: 0.3664
+---
+LAYER: 10 | HEAD: 0
+AUC score: 0.6447
+AP score: 0.4802
+Recall at top-K: 0.3580
+AUC score: 0.6257
+AP score: 0.4485
+Recall at top-K: 0.3191
+---
+LAYER: 10 | HEAD: 1
+AUC score: 0.7025
+AP score: 0.5656
+Recall at top-K: 0.4416
+AUC score: 0.6639
+AP score: 0.5303
+Recall at top-K: 0.4030
+---
+LAYER: 10 | HEAD: 2
+AUC score: 0.7150
+AP score: 0.5794
+Recall at top-K: 0.4582
+AUC score: 0.7299
+AP score: 0.6015
+Recall at top-K: 0.4799
+---
+LAYER: 10 | HEAD: 3
+AUC score: 0.7255
+AP score: 0.5914
+Recall at top-K: 0.4687
+AUC score: 0.7095
+AP score: 0.5628
+Recall at top-K: 0.4289
+---
+LAYER: 10 | HEAD: 4
+AUC score: 0.6634
+AP score: 0.5347
+Recall at top-K: 0.4130
+AUC score: 0.6493
+AP score: 0.5020
+Recall at top-K: 0.3736
+---
+LAYER: 10 | HEAD: 5
+AUC score: 0.6791
+AP score: 0.5522
+Recall at top-K: 0.4329
+AUC score: 0.6743
+AP score: 0.5321
+Recall at top-K: 0.4020
+---
+LAYER: 10 | HEAD: 6
+AUC score: 0.7051
+AP score: 0.5626
+Recall at top-K: 0.4396
+AUC score: 0.6842
+AP score: 0.5426
+Recall at top-K: 0.4075
+---
+LAYER: 10 | HEAD: 7
+AUC score: 0.6646
+AP score: 0.5294
+Recall at top-K: 0.4093
+AUC score: 0.6829
+AP score: 0.5297
+Recall at top-K: 0.3952
+---
+LAYER: 10 | HEAD: 8
+AUC score: 0.6936
+AP score: 0.5692
+Recall at top-K: 0.4464
+AUC score: 0.7052
+AP score: 0.5679
+Recall at top-K: 0.4449
+---
+LAYER: 10 | HEAD: 9
+AUC score: 0.6848
+AP score: 0.5532
+Recall at top-K: 0.4317
+AUC score: 0.6426
+AP score: 0.5021
+Recall at top-K: 0.3758
+---
+LAYER: 10 | HEAD: 10
+AUC score: 0.6959
+AP score: 0.5548
+Recall at top-K: 0.4362
+AUC score: 0.7418
+AP score: 0.6137
+Recall at top-K: 0.4953
+---
+LAYER: 10 | HEAD: 11
+AUC score: 0.6507
+AP score: 0.5149
+Recall at top-K: 0.4000
+AUC score: 0.6958
+AP score: 0.5618
+Recall at top-K: 0.4436
+---
+LAYER: 11 | HEAD: 0
+AUC score: 0.4427
+AP score: 0.3849
+Recall at top-K: 0.2690
+AUC score: 0.4926
+AP score: 0.4017
+Recall at top-K: 0.2951
+---
+LAYER: 11 | HEAD: 1
+AUC score: 0.5781
+AP score: 0.4553
+Recall at top-K: 0.3373
+AUC score: 0.5488
+AP score: 0.4171
+Recall at top-K: 0.2888
+---
+LAYER: 11 | HEAD: 2
+AUC score: 0.5848
+AP score: 0.4571
+Recall at top-K: 0.3321
+AUC score: 0.5683
+AP score: 0.4343
+Recall at top-K: 0.3111
+---
+LAYER: 11 | HEAD: 3
+AUC score: 0.4667
+AP score: 0.3742
+Recall at top-K: 0.2592
+AUC score: 0.5018
+AP score: 0.3758
+Recall at top-K: 0.2617
+---
+LAYER: 11 | HEAD: 4
+AUC score: 0.3888
+AP score: 0.3269
+Recall at top-K: 0.2137
+AUC score: 0.4304
+AP score: 0.3439
+Recall at top-K: 0.2349
+---
+LAYER: 11 | HEAD: 5
+AUC score: 0.5093
+AP score: 0.3774
+Recall at top-K: 0.2598
+AUC score: 0.5188
+AP score: 0.3736
+Recall at top-K: 0.2600
+---
+LAYER: 11 | HEAD: 6
+AUC score: 0.5894
+AP score: 0.4510
+Recall at top-K: 0.3394
+AUC score: 0.5625
+AP score: 0.4253
+Recall at top-K: 0.3036
+---
+LAYER: 11 | HEAD: 7
+AUC score: 0.5162
+AP score: 0.4268
+Recall at top-K: 0.3123
+AUC score: 0.5447
+AP score: 0.4158
+Recall at top-K: 0.3078
+---
+LAYER: 11 | HEAD: 8
+AUC score: 0.4243
+AP score: 0.3425
+Recall at top-K: 0.2274
+AUC score: 0.4732
+AP score: 0.3537
+Recall at top-K: 0.2413
+---
+LAYER: 11 | HEAD: 9
+AUC score: 0.5903
+AP score: 0.4549
+Recall at top-K: 0.3328
+AUC score: 0.5439
+AP score: 0.3953
+Recall at top-K: 0.2658
+---
+LAYER: 11 | HEAD: 10
+AUC score: 0.5506
+AP score: 0.4289
+Recall at top-K: 0.3066
+AUC score: 0.5539
+AP score: 0.4229
+Recall at top-K: 0.3014
+---
+LAYER: 11 | HEAD: 11
+AUC score: 0.4607
+AP score: 0.3716
+Recall at top-K: 0.2663
+AUC score: 0.4933
+AP score: 0.3669
+Recall at top-K: 0.2588
+---

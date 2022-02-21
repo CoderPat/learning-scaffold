@@ -193,9 +193,12 @@ class SaliencyExplainer(Explainer, metaclass=ABCMeta):
             and teacher_explainer.normalizer_fn
             in ("sparsemax", "entmax15", "softmax", "topk_softmax")
         ):
-            return softmax_loss(
-                student_explanation, teacher_explanation, mask=inputs["attention_mask"]
-            )
+            mask = inputs["attention_mask"]
+            bs = mask.shape[0]
+            gold_probs = teacher_explanation * mask
+            pred_probs = student_explanation * mask
+            loss = softmax_loss(pred_probs, gold_probs)
+            return loss * bs / mask.sum()
 
         raise ValueError("Unknown teacher/student explainer combination type")
 
