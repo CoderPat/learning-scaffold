@@ -1,0 +1,74 @@
+global {
+    ducttape_output="/projects/tir2/users/pfernand/metaexpl-experiments/cifar100-vit-vit"
+    ducttape_experimental_submitters=true
+    ducttape_experimental_imports=true
+    ducttape_experimental_multiproc=true
+    repo="/home/pfernand/repos/meta-expl"
+
+    task="cifar100"
+    task_params=""
+    num_examples=4500
+    metric="accuracy"
+
+    # models and explainers parameters
+    teacher_arch=vit-base
+    student_arch=vit-base
+    init_embed=false
+
+    teacher_explainer=attention_explainer
+    student_explainer=attention_explainer
+
+    teacher_normalizer_fn=softmax
+    student_normalizer_fn=softmax
+    teacher_init_fn=uniform
+    teacher_aggregator_idx="\"mean\""
+    student_aggregator_idx="\"mean\""
+    teacher_aggregator_dim="\"row\""
+    student_aggregator_dim="\"row\""
+    parametrize_head_coeffs=true
+    normalize_head_coeffs=(NormalizeHeadCoeffs: sparsemax="\"sparsemax\"" entmax="\"entmax\"" softmax=true none=false)
+    teacher_layer_idx=null
+    student_layer_idx=null
+    aggregator_normalizer_fn=sparsemax
+
+    # optimization paramaters
+    student_optimizer=sgd
+    num_epochs=""
+    batch_size=16
+    lr=5e-3
+    kld_coeff=(KLDCoeff: 0 5)
+    patience=5
+
+    # (meta) optimization parameters
+    metalearn=(
+        MetaLearn:
+            false=false
+            true=true
+    )
+    meta_lr=(MetaLR: 1e-3 2e-3 1e-4 2e-4 5e-4 1e-5)
+    meta_interval=1
+    meta_explicit=true
+    meta_warmup=0
+    num_resets=(NumResets: 0 100 200 300)
+
+    seed=(Seed: 0 9 11) #  30 69)
+
+    wandb_project="meta-expl-cifar100-vit-vit"
+
+    exclude="tir-0-[7,9,11,13,15,17,19,32,36],tir-0-3,tir-1-7,tir-1-11"
+    submitter=slurm
+}
+
+plan TrainTeacher {
+    reach TrainTeacher
+}
+
+plan TrainStudent { 
+    reach AverageResults via (KLDCoeff: 0)
+    reach AverageResults via (KLDCoeff: 5) * (NormalizeHeadCoeffs: sparsemax softmax entmax)
+}
+
+plan MetaTrain {
+    reach AverageResults via (KLDCoeff: 5) * (MetaLearn: true) * (MetaLR: 2e-4 5e-4) * (NormalizeHeadCoeffs: sparsemax softmax entmax)
+}
+

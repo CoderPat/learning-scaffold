@@ -1,35 +1,50 @@
 from typing import Dict, List
-from pathlib import Path
-import pandas as pd
+
+from PIL import Image
+import numpy as onp
 
 import jax.numpy as jnp
+from datasets import load_dataset
 from numpy import random
 from transformers import PreTrainedTokenizerFast
 
 
-def load_data(setup: str, split: str, seed: int = 0):
-    split_n = "dev" if split == "valid" else split
-    langpairs = ["en-de", "en-zh", "et-en", "ne-en", "ro-en", "ru-en"]
-    dataset = []
-    for langpair in langpairs:
-        data = (
-            Path(__file__).parents[2]
-            / "mlqe-pe"
-            / "data"
-            / "direct-assessments"
-            / split_n
-            / (f"{langpair}-{split_n}" if split != "test" else f"{langpair}")
-            / f"{split_n if split != 'test' else 'test20'}.{langpair.replace('-', '')}.df.short.tsv"
-        )
-        with open(data, "r") as f:
-            df = pd.read_csv(f, sep="\t", usecols=[1, 2, 3, 4, 5, 6], quoting=3)
-            dataset.extend(
-                {**row.to_dict(), "langpair": langpair} for _, row in df.iterrows()
-            )
+def load_data(
+    setup: str,
+    split: str,
+    seed: int = 0,
+):
+    """
+    Dataset reader function used for loading:
+    text and labels for training, development and testing.
+    Split sizes are done according to https://arxiv.org/abs/2012.00893
+    (but the exact splits are different)
+    Args:
+        dataset: tag to retrieve a HF dataset;
+        setup: TODO
+        split: flag to return the train/validation/test set.
+    Returns:
+        List of text and labels respective to the split of the dataset that
+        was chosen (already shuffled).
+    """
+
+    hf_dataset = load_dataset("cifar100")
+    data = hf_dataset["train" if split == "valid" or split == "train" else "test"]
+    data = list(data)
+
+    # covert image to pillow
+    for sample in data:
+        sample["img"] = Image.fromarray(onp.array(sample["img"], dtype=onp.uint8))
 
     rng = random.RandomState(seed)
-    rng.shuffle(dataset)
-    return dataset
+    rng.shuffle(data)
+
+    if split == "train":
+        data = data[:45000]
+    if split == "valid":
+        data = data[45000:50000]
+
+    return data
 
 
 def dataloader(
@@ -39,7 +54,6 @@ def dataloader(
     shuffle: bool = True,
     max_len: int = 64,
     idxs: List[int] = None,
-    sep_token: str = "[SEP]",
 ):
     """
     Dataloading function that takes a dataset and yields batcheds of data
@@ -66,18 +80,13 @@ def dataloader(
                 break
             sample = dataset[idxs[i + j]]
             batch_idxs.append(idxs[i + j])
-            batch_inputs.append(
-                f"{sample['original']} {sep_token} {sample['translation']}"
-            )
-            batch_outputs.append(jnp.array([float(sample["z_mean"])]))
+            batch_inputs.append(sample["img"])
+            batch_outputs.append(jnp.array(sample["fine_label"]))
 
         batch_inputs = dict(
             tokenizer(
-                batch_inputs,
-                padding="max_length",
-                truncation=True,
+                images=batch_inputs,
                 return_tensors="jax",
-                max_length=max_len,
             )
         )
         batch_outputs = jnp.stack(batch_outputs)

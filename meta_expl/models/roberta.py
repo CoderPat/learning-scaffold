@@ -1,9 +1,12 @@
 import flax.linen as nn
 import jax.numpy as jnp
+
 from transformers import RobertaConfig
 from transformers.models.roberta.modeling_flax_roberta import (
     FlaxRobertaForSequenceClassificationModule,
 )
+
+from .scalar_mix import ScalarMix
 
 
 class RobertaModel(nn.Module):
@@ -28,8 +31,10 @@ class RobertaModel(nn.Module):
         if attention_mask is None:
             attention_mask = jnp.ones_like(input_ids)
 
+        # TODO: we don't need to use the sequence classification module
+        # keeping it for simplicity
         roberta_module = FlaxRobertaForSequenceClassificationModule(config=self.config)
-        outputs, hidden_states, attentions = roberta_module(
+        _, hidden_states, attentions = roberta_module(
             input_ids,
             attention_mask=attention_mask,
             token_type_ids=token_type_ids,
@@ -39,6 +44,11 @@ class RobertaModel(nn.Module):
             unnorm_attention=True,
             deterministic=deterministic,
             return_dict=False,
+        )
+
+        outputs = ScalarMix()(hidden_states, attention_mask)
+        outputs = roberta_module.classifier(
+            outputs[:, None, :], deterministic=deterministic
         )
         state = {"hidden_states": hidden_states, "attentions": attentions}
         return outputs, state

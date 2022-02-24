@@ -5,6 +5,8 @@ from transformers.models.electra.modeling_flax_electra import (
     FlaxElectraForSequenceClassificationModule,
 )
 
+from .scalar_mix import ScalarMix
+
 
 class ElectraModel(nn.Module):
     """A Electra-based classification module"""
@@ -60,7 +62,7 @@ class ElectraModel(nn.Module):
         )
 
         electra_module = FlaxElectraForSequenceClassificationModule(config=config)
-        outputs, hidden_states, attentions = electra_module(
+        _, hidden_states, attentions = electra_module(
             input_ids,
             attention_mask=attention_mask,
             token_type_ids=token_type_ids,
@@ -70,6 +72,11 @@ class ElectraModel(nn.Module):
             unnorm_attention=True,
             deterministic=deterministic,
             return_dict=False,
+        )
+
+        outputs = ScalarMix()(hidden_states, attention_mask)
+        outputs = electra_module.classifier(
+            outputs[:, None, :], deterministic=deterministic
         )
         state = {"hidden_states": hidden_states, "attentions": attentions}
         return outputs, state
