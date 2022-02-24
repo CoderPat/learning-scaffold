@@ -9,22 +9,21 @@ import jax.numpy as jnp
 from transformers import (
     BertConfig,
     ElectraConfig,
-    DistilBertConfig,
     RobertaConfig,
+    ViTConfig,
     FlaxElectraForSequenceClassification,
     FlaxBertForSequenceClassification,
-    FlaxDistilBertForSequenceClassification,
     FlaxRobertaForSequenceClassification,
+    FlaxViTForImageClassification,
 )
 
 from meta_expl.utils import is_jsonable
 
+from .vit import ViTModel
 from .bert import BertModel
-from .distilbert import DistilBertModel
 from .electra import ElectraModel
 from .roberta import RobertaModel
 from .embedding import EmbedAttentionModel
-from .recurrent import BiLSTMModel
 
 # TODO: major refactor of this
 
@@ -32,8 +31,8 @@ from .recurrent import BiLSTMModel
 def create_model(
     key: jax.random.PRNGKey,
     inputs: Dict[str, Any],
-    vocab_size: int,
     num_classes: int,
+    vocab_size: int = None,
     arch: str = "bert",
     batch_size: int = 16,
     max_len: int = 512,
@@ -62,27 +61,6 @@ def create_model(
 
         assert "FlaxBertForSequenceClassificationModule_0" in params["params"]
         params["params"]["FlaxBertForSequenceClassificationModule_0"] = model.params
-        params = flax.core.freeze(params)
-
-    elif arch == "mbert-distill":
-        # load pretrained model and create module based on its parameters
-        model = FlaxDistilBertForSequenceClassification.from_pretrained(
-            "distilbert-base-multilingual-cased",
-            num_labels=num_classes,
-            from_pt=True,
-        )
-
-        assert vocab_size == model.config.vocab_size
-        classifier = DistilBertModel(num_labels=num_classes, config=model.config)
-        params = classifier.init(key, **inputs)
-
-        # replace original parameters with pretrained parameters
-        params = params.unfreeze()
-
-        assert "FlaxDistilBertForSequenceClassificationModule_0" in params["params"]
-        params["params"][
-            "FlaxDistilBertForSequenceClassificationModule_0"
-        ] = model.params
         params = flax.core.freeze(params)
 
     elif arch == "xlm-r" or arch == "xlm-r-large":
@@ -136,19 +114,22 @@ def create_model(
         params["params"]["FlaxElectraForSequenceClassificationModule_0"] = model.params
         params = flax.core.freeze(params)
 
-    elif arch == "lstm":
-        classifier = BiLSTMModel(
-            num_classes=num_classes,
-            vocab_size=vocab_size,
-            embedding_size=embeddings.shape[1]
-            if embeddings is not None
-            else embeddings_dim,
+    elif arch == "vit-base":
+        model = FlaxViTForImageClassification.from_pretrained(
+            "google/vit-base-patch16-224-in21k",
+            num_labels=num_classes,
         )
-
-        # instantiate model parameters
+        classifier = ViTModel(
+            num_labels=num_classes,
+            config=model.config,
+        )
         params = classifier.init(key, **inputs)
-        if embeddings is not None:
-            classifier.replace_embeddings(params, embeddings)
+
+        # replace original parameters with pretrained parameters
+        params = params.unfreeze()
+        assert "FlaxViTForImageClassificationModule_0" in params["params"]
+        params["params"]["FlaxViTForImageClassificationModule_0"] = model.params
+        params = flax.core.freeze(params)
 
     elif arch == "embedding":
         classifier = EmbedAttentionModel(
@@ -207,16 +188,14 @@ def save_model(
             config["model_baseconfig"] = model.config.to_dict()
         if model.__class__ == BertModel:
             config["model_type"] = "bert"
-        elif model.__class__ == DistilBertModel:
-            config["model_type"] = "distilbert"
         elif model.__class__ == ElectraModel:
             config["model_type"] = "electra"
         elif model.__class__ == RobertaModel:
             config["model_type"] = "roberta"
+        elif model.__class__ == ViTModel:
+            config["model_type"] = "vit"
         elif model.__class__ == EmbedAttentionModel:
             config["model_type"] = "embed"
-        elif model.__class__ == BiLSTMModel:
-            config["model_type"] = "recurrent"
         else:
             raise ValueError("unknown model type")
         json.dump(config, f)
@@ -224,6 +203,7 @@ def save_model(
 
 def load_model(
     model_dir: str,
+    inputs: Dict[str, Any],
     batch_size: int = 16,
     max_len: int = 256,
     suffix: str = "best",
@@ -241,10 +221,6 @@ def load_model(
         if "model_baseconfig" in config:
             baseconfig = BertConfig.from_dict(config["model_baseconfig"])
         model_class = BertModel
-    elif config["model_type"] == "distilbert":
-        if "model_baseconfig" in config:
-            baseconfig = DistilBertConfig.from_dict(config["model_baseconfig"])
-        model_class = DistilBertModel
     elif config["model_type"] == "electra":
         if "model_baseconfig" in config:
             baseconfig = ElectraConfig.from_dict(config["model_baseconfig"])
@@ -253,10 +229,12 @@ def load_model(
         if "model_baseconfig" in config:
             baseconfig = RobertaConfig.from_dict(config["model_baseconfig"])
         model_class = RobertaModel
+    elif config["model_type"] == "vit":
+        if "model_baseconfig" in config:
+            baseconfig = ViTConfig.from_dict(config["model_baseconfig"])
+        model_class = ViTModel
     elif config["model_type"] == "embed":
         model_class = EmbedAttentionModel
-    elif config["model_type"] == "recurrent":
-        model_class = BiLSTMModel
     else:
         raise ValueError("unknown model type")
 
@@ -268,8 +246,7 @@ def load_model(
 
     # instantiate (dummy) model parameters
     key = jax.random.PRNGKey(0)
-    dummy_inputs = jnp.ones((batch_size, max_len), jnp.int32)
-    params = classifier.init(key, dummy_inputs)
+    params = classifier.init(key, **inputs)
 
     # replace params with saved params
     with open(os.path.join(model_dir, f"model_{suffix}.ckpt"), "rb") as f:
@@ -278,7 +255,7 @@ def load_model(
     # create dummy state for initalizing an explainer
     _, state = classifier.apply(
         params,
-        dummy_inputs,
+        **inputs,
     )
 
     return classifier, params, state

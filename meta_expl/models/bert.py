@@ -7,6 +7,7 @@ from transformers.models.bert.modeling_flax_bert import (
 
 from .scalar_mix import ScalarMix
 
+
 class BertModel(nn.Module):
     """A BERT-based classification module"""
 
@@ -43,7 +44,9 @@ class BertModel(nn.Module):
         )
 
         outputs = ScalarMix()(hidden_states, attention_mask)
-        outputs = bert_module.classifier(outputs[:, None, :], deterministic=deterministic)
+        outputs = bert_module.classifier(
+            outputs[:, None, :], deterministic=deterministic
+        )
 
         state = {"hidden_states": hidden_states, "attentions": attentions}
         return outputs, state

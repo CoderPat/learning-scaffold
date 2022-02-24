@@ -1,0 +1,87 @@
+global {
+    ducttape_output="/projects/tir2/users/pfernand/metaexpl-experiments/mlqe-xlmr-xlmr-scalarmix"
+    ducttape_experimental_submitters=true
+    ducttape_experimental_imports=true
+    ducttape_experimental_multiproc=true
+    repo="/home/pfernand/repos/meta-expl"
+
+    task="mlqe"
+    task_params=""
+    num_examples=(NumExamples: 4100 1050 2100 8400)
+    metric="pearson"
+
+    # models and explainers parameters
+    teacher_arch=xlm-r
+    student_arch=xlm-r
+    init_embed=true
+
+    teacher_explainer=(
+        TeacherExplainer:
+            attention="attention_explainer"
+            attention_query="attention_query_explainer"
+            hidden_qk="hidden_qk_explainer"
+    )
+    student_explainer=attention_explainer
+
+    teacher_normalizer_fn=(TeacherNormalizerFn: softmax topk_softmax)
+    student_normalizer_fn=softmax
+    teacher_init_fn=(TeacherInitFn: uniform head_113)
+    teacher_aggregator_idx="\"mean\""
+    student_aggregator_idx="\"mean\""
+    teacher_aggregator_dim="\"row\""
+    student_aggregator_dim="\"row\""
+    parametrize_head_coeffs=true
+    normalize_head_coeffs=(NormalizeHeadCoeffs: sparsemax="\"sparsemax\"" entmax="\"entmax\"" softmax=true softmax_hot="\"softmax_hot\"" none=false)
+    teacher_layer_idx=null
+    student_layer_idx=null
+    aggregator_normalizer_fn=sparsemax
+
+    # optimization paramaters
+    student_optimizer=sgd
+    num_epochs=""
+    batch_size=16
+    lr=5e-3
+    kld_coeff=(KLDCoeff: 0 5)
+    patience=5
+
+    # (meta) optimization parameters
+    metalearn=(
+        MetaLearn:
+            false=false
+            true=true
+    )
+    meta_lr=(MetaLR: 1e-3 2e-3 1e-4 2e-4 5e-4 1e-5)
+    meta_interval=1
+    meta_explicit=true
+    meta_warmup=0
+    num_resets=(NumResets: 0 100 200 300)
+
+    seed=(Seed: 0 9 11) #  30 69)
+
+    wandb_project="meta-expl-mlqe-xlmr-xlmr-scalarmix"
+
+    exclude="tir-0-[7,9,11,13,15,17,19,32,36],tir-0-3,tir-1-7,tir-1-11"
+    submitter=slurm
+}
+
+plan TrainTeacher {
+    reach TrainTeacher
+}
+
+plan TrainStudent { 
+    reach AverageResults via (KLDCoeff: 0)
+    reach AverageResults via (KLDCoeff: 5) * (TeacherExplainer: attention) * (NormalizeHeadCoeffs: sparsemax softmax entmax) * (TeacherNormalizerFn: *)
+    reach AverageResults via (KLDCoeff: 5) * (TeacherExplainer: attention) * (NormalizeHeadCoeffs: softmax_hot)
+}
+
+plan MetaTrain {
+    reach AverageResults via (KLDCoeff: 5) * (MetaLearn: true) * (TeacherExplainer: attention) * (MetaLR: 2e-4) * (NormalizeHeadCoeffs: sparsemax softmax entmax) * (TeacherNormalizerFn: *)
+    reach AverageResults via (KLDCoeff: 5) * (MetaLearn: true) * (TeacherExplainer: attention) * (MetaLR: 5e-4 1e-3) * (NormalizeHeadCoeffs: sparsemax)
+    reach AverageResults via (KLDCoeff: 5) * (MetaLearn: true) * (TeacherExplainer: attention) * (MetaLR: 5e-4 1e-3) * (NormalizeHeadCoeffs: softmax entmax)
+    reach AverageResults via (KLDCoeff: 5) * (MetaLearn: true) * (TeacherExplainer: attention) * (MetaLR: 5e-4) * (NormalizeHeadCoeffs: softmax_hot)
+}
+
+plan SingleHead {
+    reach AverageResults via (KLDCoeff: 5) * (TeacherInitFn: head_113)
+}
+

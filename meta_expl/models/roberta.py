@@ -47,7 +47,9 @@ class RobertaModel(nn.Module):
         )
 
         outputs = ScalarMix()(hidden_states, attention_mask)
-        outputs = roberta_module.classifier(outputs[:, None, :], deterministic=deterministic)
+        outputs = roberta_module.classifier(
+            outputs[:, None, :], deterministic=deterministic
+        )
         state = {"hidden_states": hidden_states, "attentions": attentions}
         return outputs, state
 
