@@ -195,6 +195,10 @@ def read_args():
         default=None,
         help="Directory to save the trained teacher explainer. ",
     )
+    parser.add_argument(
+        "--do-save", 
+        action="store_true"
+    )
 
     # Logging
     parser.add_argument(
@@ -765,13 +769,16 @@ def main(args):
         if resets >= args.num_resets and valid_metrics[0] > best_metric:
             best_metric = valid_metrics[0]
             best_params = params
-            if args.model_dir is not None:
+            if args.model_dir is not None and args.do_save:
+                print('Saving student: ', args.model_dir)
                 save_model(args.model_dir, classifier, params)
 
-            if args.setup != "no_teacher" and args.explainer_dir is not None:
+            if args.setup != "no_teacher" and args.explainer_dir is not None and args.do_save:
+                print('Saving student explainer: ', args.explainer_dir)
                 save_explainer(args.explainer_dir, explainer, explainer_params)
 
-            if args.setup != "no_teacher" and args.teacher_explainer_dir is not None:
+            if args.setup != "no_teacher" and args.teacher_explainer_dir is not None and args.do_save:
+                print('Saving teacher explainer: ', args.teacher_explainer_dir)
                 save_explainer(
                     args.teacher_explainer_dir,
                     teacher_explainer,
