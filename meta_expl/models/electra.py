@@ -75,7 +75,9 @@ class ElectraModel(nn.Module):
         )
 
         outputs = ScalarMix()(hidden_states, attention_mask)
-        outputs = electra_module.classifier(outputs[:, None, :], deterministic=deterministic)
+        outputs = electra_module.classifier(
+            outputs[:, None, :], deterministic=deterministic
+        )
         state = {"hidden_states": hidden_states, "attentions": attentions}
         return outputs, state
 

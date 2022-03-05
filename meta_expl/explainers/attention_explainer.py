@@ -62,6 +62,8 @@ class AttentionExplainer(SaliencyExplainer):
                 headcoeffs = sparsemax(headcoeffs)
             elif self.normalize_head_coeffs == "entmax":
                 headcoeffs = entmax15(headcoeffs)
+            elif self.normalize_head_coeffs == "softmax_hot":
+                headcoeffs = nn.softmax(headcoeffs * 10)
             else:
                 headcoeffs = nn.softmax(headcoeffs)
 
@@ -73,10 +75,17 @@ class AttentionExplainer(SaliencyExplainer):
             else:
                 raise ValueError("Unknown aggregator_dim")
         elif self.aggregator_idx == "mean":
-            coeffs = jax.lax.select(
-                inputs["attention_mask"] > 0,
-                jnp.full(inputs["attention_mask"].shape, 1),
-                jnp.full(inputs["attention_mask"].shape, 0),
+            coeffs = (
+                jax.lax.select(
+                    inputs["attention_mask"] > 0,
+                    jnp.full(inputs["attention_mask"].shape, 1),
+                    jnp.full(inputs["attention_mask"].shape, 0),
+                )
+                if "attention_mask" in inputs
+                else jnp.ones(
+                    (head_attentions.shape[0], head_attentions.shape[2]),
+                    dtype=jnp.float32,
+                )
             )
             coeffs = coeffs / jnp.sum(coeffs, axis=-1, keepdims=True)
             if self.aggregator_dim == "row":

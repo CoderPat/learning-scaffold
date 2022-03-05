@@ -155,10 +155,14 @@ class SaliencyExplainer(Explainer, metaclass=ABCMeta):
     def __call__(self, inputs, state):
         normalizer_fn = self.prepare_normalizer_fn()
         logits = self.logit_computation(inputs, state)
-        bias = jax.lax.select(
-            inputs["attention_mask"] > 0,
-            jnp.full(inputs["attention_mask"].shape, 0.0),
-            jnp.full(inputs["attention_mask"].shape, -1e10),
+        bias = (
+            jax.lax.select(
+                inputs["attention_mask"] > 0,
+                jnp.full(inputs["attention_mask"].shape, 0.0),
+                jnp.full(inputs["attention_mask"].shape, -1e10),
+            )
+            if "attention_mask" in inputs
+            else jnp.zeros(logits.shape)
         )
         return normalizer_fn(logits + bias, axis=-1), {"z": logits}
 
@@ -194,7 +198,9 @@ class SaliencyExplainer(Explainer, metaclass=ABCMeta):
             in ("sparsemax", "entmax15", "softmax", "topk_softmax")
         ):
             return softmax_loss(
-                student_explanation, teacher_explanation, mask=inputs["attention_mask"]
+                student_explanation,
+                teacher_explanation,
+                mask=inputs["attention_mask"] if "attention_mask" in inputs else None,
             )
 
         raise ValueError("Unknown teacher/student explainer combination type")

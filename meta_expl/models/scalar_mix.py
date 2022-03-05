@@ -6,9 +6,10 @@ import jax.numpy as jnp
 
 class ScalarMix(nn.Module):
     """Simplified ScalarMix"""
+
     @nn.compact
     def __call__(
-        self, 
+        self,
         tensors: List[jnp.array],
         mask: jnp.array = None,
     ) -> jnp.array:
@@ -25,12 +26,10 @@ class ScalarMix(nn.Module):
         weights = nn.softmax(coefficients)
         means = jnp.stack(
             [
-                jnp.sum(tensor * mask[:, :, None], axis=1) / jnp.sum(mask, axis=1)[:, None] 
+                jnp.sum(tensor * mask[:, :, None], axis=1)
+                / jnp.sum(mask, axis=1)[:, None]
                 for tensor in tensors
             ]
         )
         out = gamma * jnp.sum(weights[:, None, None] * means, axis=0)
         return out
-
-
-        
