@@ -16,6 +16,7 @@ from transformers import (
     BertTokenizerFast,
     DistilBertTokenizerFast,
     XLMRobertaTokenizerFast,
+    ViTFeatureExtractor,
 )
 
 from meta_expl.explainers import EXPLAINER_REGISTRY, create_explainer, save_explainer
@@ -46,22 +47,14 @@ def read_args():
         default="no_teacher",
         help="TODO: proper documentation",
     )
-    parser.add_argument("--task", default="imdb", choices=["imdb", "mlqe", "sst2"])
+    parser.add_argument("--task", default="imdb", choices=["imdb", "mlqe", "cifar100"])
     parser.add_argument("--task-params", default="{}", type=json.loads)
 
     # Parameters defining "main model"
     parser.add_argument(
         "--arch",
         default="electra",
-        choices=[
-            "electra",
-            "xlm-r",
-            "xlm-r-large",
-            "mbert",
-            "mbert-distill",
-            "lstm",
-            "embedding",
-        ],
+        choices=["electra", "xlm-r", "xlm-r-large", "mbert", "embedding", "vit-base"],
     )
     parser.add_argument(
         "--explainer",
@@ -466,6 +459,7 @@ def main(args):
 
         num_classes = 2
         task_type = "classification"
+        modality = "text"
         criterion = cross_entropy_loss
         metrics = [accuracy]
     elif args.task == "sst2":
@@ -478,6 +472,7 @@ def main(args):
 
         num_classes = 2
         task_type = "classification"
+        modality = "text"
         criterion = cross_entropy_loss
         metrics = [accuracy]
     elif args.task == "mlqe":
@@ -495,8 +490,22 @@ def main(args):
 
         num_classes = 1
         task_type = "regression"
+        modality = "text"
         criterion = mse_loss
         metrics = [pearson, neg_rmse]
+    elif args.task == "cifar100":
+        from meta_expl.data.cifar100 import dataloader, load_data
+
+        train_data = load_data(args.setup, "train")
+        valid_data = load_data(args.setup, "valid")
+        if args.setup != "no_teacher":
+            test_data = load_data(args.setup, "test")
+
+        num_classes = 100
+        task_type = "classification"
+        modality = "image"
+        criterion = cross_entropy_loss
+        metrics = [accuracy]
     else:
         raise ValueError(f"Unknown task {args.task}")
 
@@ -507,33 +516,49 @@ def main(args):
         tokenizer = ElectraTokenizerFast.from_pretrained(
             "google/electra-small-discriminator"
         )
+        vocab_size = len(tokenizer)
     elif args.tokenizer == "mbert":
         tokenizer = BertTokenizerFast.from_pretrained("bert-base-multilingual-cased")
+        vocab_size = len(tokenizer)
     elif args.tokenizer == "mbert-distill":
         tokenizer = DistilBertTokenizerFast.from_pretrained(
             "distilbert-base-multilingual-cased"
         )
+        vocab_size = len(tokenizer)
     elif args.tokenizer == "xlm-r":
         tokenizer = XLMRobertaTokenizerFast.from_pretrained("xlm-roberta-base")
+        vocab_size = len(tokenizer)
     elif args.tokenizer == "xlm-r-large":
         tokenizer = XLMRobertaTokenizerFast.from_pretrained("xlm-roberta-large")
+        vocab_size = len(tokenizer)
+    elif args.tokenizer == "vit-base":
+        tokenizer = ViTFeatureExtractor.from_pretrained(
+            "google/vit-base-patch16-224-in21k"
+        )
+        vocab_size = None
     else:
         raise ValueError("unknown tokenizer type")
 
     # create dummy inputs for model instantiation
-    input_ids = jnp.ones((args.batch_size, args.max_len), jnp.int32)
-    dummy_inputs = {
-        "input_ids": input_ids,
-        "attention_mask": jnp.ones_like(input_ids),
-        "token_type_ids": jnp.arange(jnp.atleast_2d(input_ids).shape[-1]),
-        "position_ids": jnp.ones_like(input_ids),
-    }
+    if modality == "text":
+        input_ids = jnp.ones((args.batch_size, args.max_len), jnp.int32)
+        dummy_inputs = {
+            "input_ids": input_ids,
+            "attention_mask": jnp.ones_like(input_ids),
+            "token_type_ids": jnp.arange(jnp.atleast_2d(input_ids).shape[-1]),
+            "position_ids": jnp.ones_like(input_ids),
+        }
+    elif modality == "image":
+        dummy_inputs = {"pixel_values": jnp.ones((args.batch_size, 3, 224, 224))}
 
     # load teacher model for training student
     embeddings = None
     if args.teacher_dir is not None:
         teacher, teacher_params, dummy_state = load_model(
-            model_dir=args.teacher_dir, batch_size=args.batch_size, max_len=args.max_len
+            model_dir=args.teacher_dir,
+            inputs=dummy_inputs,
+            batch_size=args.batch_size,
+            max_len=args.max_len,
         )
         teacher_explainer, teacher_explainer_params = create_explainer(
             key=next(keyseq),
@@ -552,8 +577,8 @@ def main(args):
     classifier, params, dummy_state = create_model(
         key=next(keyseq),
         inputs=dummy_inputs,
-        vocab_size=len(tokenizer),
         num_classes=num_classes,
+        vocab_size=vocab_size,
         arch=args.arch,
         batch_size=args.batch_size,
         max_len=args.max_len,
@@ -566,19 +591,6 @@ def main(args):
         explainer_type=args.explainer,
         explainer_args=args.explainer_params,
     )
-
-    # load teacher model for training student
-    if args.teacher_dir is not None:
-        teacher, teacher_params, dummy_state = load_model(
-            model_dir=args.teacher_dir, batch_size=args.batch_size, max_len=args.max_len
-        )
-        teacher_explainer, teacher_explainer_params = create_explainer(
-            key=next(keyseq),
-            inputs=dummy_inputs,
-            state=dummy_state,
-            explainer_type=args.teacher_explainer,
-            explainer_args=args.teacher_explainer_params,
-        )
 
     # load optimizer
     # TODO: allow different optimizer
@@ -621,7 +633,7 @@ def main(args):
                     )
                 y = teacher_predict(x)
                 if task_type == "classification":
-                    y = jnp.argmax(teacher_predict(x), axis=-1)
+                    y = jnp.argmax(y, axis=-1)
 
             loss, outputs = eval_step(classifier, criterion, params, x, y)
             total += y.shape[0]
