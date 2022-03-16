@@ -73,7 +73,9 @@ class BertModel(nn.Module):
                 return_dict=False,
             )
             outputs = self.scalarmix(hidden_states, inputs["attention_mask"])
-            outputs = self.bert_module.classifier(outputs[:, None, :], deterministic=True)
+            outputs = self.bert_module.classifier(
+                outputs[:, None, :], deterministic=True
+            )
             # we use sum over batch dimension since
             # we need batched gradient and because embeddings
             # on each sample are independent
@@ -83,6 +85,6 @@ class BertModel(nn.Module):
         return jax.grad(model_fn)
 
     def extract_embeddings(self, params):
-        return params["params"]["FlaxBertForSequenceClassificationModule_0"][
-            "bert"
-        ]["embeddings"]["word_embeddings"]["embedding"]
+        return params["params"]["FlaxBertForSequenceClassificationModule_0"]["bert"][
+            "embeddings"
+        ]["word_embeddings"]["embedding"]
