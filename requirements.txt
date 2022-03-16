@@ -1,5 +1,5 @@
-jax
-jaxlib
+jax==0.2.26
+jaxlib==0.1.72
 datasets
 optax
 pkbar
