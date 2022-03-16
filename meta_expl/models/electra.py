@@ -5,6 +5,9 @@ from transformers.models.electra.modeling_flax_electra import (
     FlaxElectraForSequenceClassificationModule,
 )
 
+import jax
+import flax
+
 from .scalar_mix import ScalarMix
 
 
@@ -28,7 +31,25 @@ class ElectraModel(nn.Module):
     add_pooling_layer: bool = True
     dtype = jnp.float32
 
-    @nn.compact
+    def setup(self):
+        config = ElectraConfig(
+            num_labels=self.num_labels,
+            vocab_size=self.vocab_size,
+            embedding_size=self.embedding_size,
+            hidden_size=self.hidden_size,
+            type_vocab_size=self.type_vocab_size,
+            max_length=self.max_length,
+            num_encoder_layers=self.num_encoder_layers,
+            num_heads=self.num_heads,
+            head_size=self.head_size,
+            intermediate_size=self.intermediate_size,
+            dropout_rate=self.dropout_rate,
+            hidden_act=self.hidden_act,
+            dtype=self.dtype,
+        )
+        self.electra_module = FlaxElectraForSequenceClassificationModule(config=config)
+        self.scalarmix = ScalarMix()
+
     def __call__(
         self,
         input_ids,
@@ -45,24 +66,7 @@ class ElectraModel(nn.Module):
         if attention_mask is None:
             attention_mask = jnp.ones_like(input_ids)
 
-        config = ElectraConfig(
-            num_labels=self.num_labels,
-            vocab_size=self.vocab_size,
-            embedding_size=self.embedding_size,
-            hidden_size=self.hidden_size,
-            type_vocab_size=self.type_vocab_size,
-            max_length=self.max_length,
-            num_encoder_layers=self.num_encoder_layers,
-            num_heads=self.num_heads,
-            head_size=self.head_size,
-            intermediate_size=self.intermediate_size,
-            dropout_rate=self.dropout_rate,
-            hidden_act=self.hidden_act,
-            dtype=self.dtype,
-        )
-
-        electra_module = FlaxElectraForSequenceClassificationModule(config=config)
-        _, hidden_states, attentions = electra_module(
+        _, hidden_states, attentions = self.electra_module(
             input_ids,
             attention_mask=attention_mask,
             token_type_ids=token_type_ids,
@@ -74,12 +78,45 @@ class ElectraModel(nn.Module):
             return_dict=False,
         )
 
-        outputs = ScalarMix()(hidden_states, attention_mask)
-        outputs = electra_module.classifier(
+        outputs = self.scalarmix(hidden_states, attention_mask)
+        outputs = self.electra_module.classifier(
             outputs[:, None, :], deterministic=deterministic
         )
-        state = {"hidden_states": hidden_states, "attentions": attentions}
+
+        state = {
+            "outputs": outputs,
+            "hidden_states": hidden_states,
+            "attentions": attentions,
+        }
         return outputs, state
+
+    # define gradient over embeddings
+    def embeddings_grad_fn(
+        self,
+        inputs,
+    ):
+        def model_fn(word_embeddings, y):
+            _, hidden_states, _ = self.electra_module.electra.encoder(
+                word_embeddings,
+                inputs["attention_mask"],
+                head_mask=None,
+                output_hidden_states=True,
+                output_attentions=True,
+                unnorm_attention=True,
+                deterministic=True,
+                return_dict=False,
+            )
+            outputs = self.scalarmix(hidden_states, inputs["attention_mask"])
+            outputs = self.electra_module.classifier(
+                outputs[:, None, :], deterministic=True
+            )
+            # we use sum over batch dimension since
+            # we need batched gradient and because embeddings
+            # on each sample are independent
+            # summing will just retrieve the batched gradient
+            return jnp.sum(outputs[jnp.arange(outputs.shape[0]), y], axis=0)
+
+        return jax.grad(model_fn)
 
     def extract_embeddings(self, params):
         return (
@@ -90,3 +127,33 @@ class ElectraModel(nn.Module):
                 "embeddings"
             ]["position_embeddings"]["embedding"],
         )
+
+    @staticmethod
+    def convert_to_new_checkpoint(self, old_params):
+        keymap = {
+            "FlaxElectraForSequenceClassificationModule_0": "electra_module",
+            "ScalarMix_0": "scalarmix",
+        }
+        new_params = {"params": {}}
+        for key, value in old_params["params"].items():
+            if key in keymap:
+                new_params["params"][keymap[key]] = value
+            else:
+                new_params["params"][key] = value
+
+        return flax.core.freeze(new_params)
+
+    @staticmethod
+    def convert_to_old_checkpoint(self, new_params):
+        keymap = {
+            "electra_module": "FlaxElectraForSequenceClassificationModule_0",
+            "scalarmix": "ScalarMix_0",
+        }
+        old_params = {"params": {}}
+        for key, value in new_params["params"].items():
+            if key in keymap:
+                old_params["params"][keymap[key]] = value
+            else:
+                old_params["params"][key] = value
+
+        return flax.core.freeze(old_params)

@@ -25,7 +25,7 @@ class Explainer(nn.Module, metaclass=ABCMeta):
         raise NotImplementedError()
 
     @nn.compact
-    def __call__(self, inputs, state):
+    def __call__(self, inputs, state, **model_extras):
         raise NotImplementedError()
 
     @classmethod
@@ -72,13 +72,14 @@ def create_explainer(
     key: jax.random.PRNGKey,
     inputs: Any,
     state: Dict,
+    model_extras: Dict,
     explainer_type: str,
     explainer_args: Dict = {},
 ):
     """Creates an explainer"""
     explainer = EXPLAINER_REGISTRY[explainer_type](**explainer_args)
     # instantiate model parameters
-    params = explainer.init(key, inputs, state)
+    params = explainer.init(key, inputs, state, **model_extras)
     return explainer, params
 
 
@@ -107,7 +108,13 @@ def save_explainer(
         json.dump(config, f)
 
 
-def load_explainer(explainer_dir: str, inputs: Any, state: Dict, suffix: str = "best"):
+def load_explainer(
+    explainer_dir: str,
+    inputs: Any,
+    state: Dict,
+    model_extras: Dict,
+    suffix: str = "best",
+):
     """
     Loads a serialized explainer
     """
@@ -121,7 +128,7 @@ def load_explainer(explainer_dir: str, inputs: Any, state: Dict, suffix: str = "
 
     # intialized random parameters
     key = jax.random.PRNGKey(0)
-    params = explainer.init(key, inputs, state)
+    params = explainer.init(key, inputs, state, **model_extras)
 
     # replace params with saved params
     with open(os.path.join(explainer_dir, f"model_{suffix}.ckpt"), "rb") as f:
@@ -152,9 +159,9 @@ class SaliencyExplainer(Explainer, metaclass=ABCMeta):
             return self.normalizer_fn
 
     @nn.compact
-    def __call__(self, inputs, state):
+    def __call__(self, inputs, state, **model_extras):
         normalizer_fn = self.prepare_normalizer_fn()
-        logits = self.logit_computation(inputs, state)
+        logits = self.logit_computation(inputs, state, **model_extras)
         bias = (
             jax.lax.select(
                 inputs["attention_mask"] > 0,

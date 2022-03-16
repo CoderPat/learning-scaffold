@@ -263,7 +263,14 @@ def train_step_with_teacher(
     if task_type == "classification":
         y_teacher = jnp.argmax(y_teacher, axis=-1)
 
-    teacher_expl, _ = teacher_explainer.apply(teacher_explainer_params, x, teacher_attn)
+    teacher_extras = {
+        "grad_fn": teacher_explainer.apply(
+            teacher_explainer_params, x, method=teacher_explainer.embeddings_grad_fn
+        )
+    }
+    teacher_expl, _ = teacher_explainer.apply(
+        teacher_explainer_params, x, teacher_attn, **teacher_extras
+    )
 
     def loss_fn(params):
         student_params, student_explainer_params = params
@@ -278,8 +285,13 @@ def train_step_with_teacher(
         main_loss = criterion(outputs, y_teacher)
 
         # compute explanations based on attention for both teacher and student
-        student_expl, s_extras = student_explainer.apply(
-            student_explainer_params, x, student_state
+        student_extras = {
+            "grad_fn": student_explainer.apply(
+                student_explainer_params, x, method=student_explainer.embeddings_grad_fn
+            )
+        }
+        student_expl, expl_extras = student_explainer.apply(
+            student_explainer_params, x, student_state, **student_extras
         )
         expl_loss = teacher_explainer.loss_fn(
             x,
@@ -287,7 +299,7 @@ def train_step_with_teacher(
             teacher_explainer=teacher_explainer,
             student_explanation=student_expl,
             teacher_explanation=teacher_expl,
-            **s_extras,
+            **expl_extras,
         )
 
         return main_loss + expl_coeff * expl_loss, {
@@ -347,6 +359,14 @@ def metatrain_step(
     if task_type == "classification":
         y_teacher = jnp.argmax(y_teacher, axis=-1)
 
+    teacher_extras = {
+        "grad_fn": teacher_explainer.apply(
+            teacher_explainer_params,
+            train_x,
+            method=teacher_explainer.embeddings_grad_fn,
+        )
+    }
+
     def train_loss_fn(params, metaparams):
         student_params, student_explainer_params = params
         teacher_explainer_params = metaparams
@@ -360,12 +380,22 @@ def metatrain_step(
         )
         main_loss = criterion(outputs, y_teacher)
 
-        # compute explanations based on attention for both teacher and student
-        student_expl, s_extras = student_explainer.apply(
-            student_explainer_params, train_x, student_state
+        # compute explanations
+        student_extras = {
+            "grad_fn": student_explainer.apply(
+                student_explainer_params,
+                train_x,
+                method=student_explainer.embeddings_grad_fn,
+            )
+        }
+        student_expl, expl_extras = student_explainer.apply(
+            student_explainer_params,
+            train_x,
+            student_state,
+            **student_extras,
         )
         teacher_expl, _ = teacher_explainer.apply(
-            teacher_explainer_params, train_x, teacher_state
+            teacher_explainer_params, train_x, teacher_state, **teacher_extras
         )
         expl_loss = teacher_explainer.loss_fn(
             train_x,
@@ -373,7 +403,7 @@ def metatrain_step(
             teacher_explainer=teacher_explainer,
             student_explanation=student_expl,
             teacher_explanation=teacher_expl,
-            **s_extras,
+            **expl_extras,
         )
 
         return main_loss + expl_coeff * expl_loss
