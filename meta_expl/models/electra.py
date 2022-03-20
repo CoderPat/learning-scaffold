@@ -129,7 +129,7 @@ class ElectraModel(nn.Module):
         )
 
     @staticmethod
-    def convert_to_new_checkpoint(self, old_params):
+    def convert_to_new_checkpoint(old_params):
         keymap = {
             "FlaxElectraForSequenceClassificationModule_0": "electra_module",
             "ScalarMix_0": "scalarmix",
@@ -144,7 +144,7 @@ class ElectraModel(nn.Module):
         return flax.core.freeze(new_params)
 
     @staticmethod
-    def convert_to_old_checkpoint(self, new_params):
+    def convert_to_old_checkpoint(new_params):
         keymap = {
             "electra_module": "FlaxElectraForSequenceClassificationModule_0",
             "scalarmix": "ScalarMix_0",

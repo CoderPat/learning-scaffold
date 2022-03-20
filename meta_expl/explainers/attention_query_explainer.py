@@ -17,6 +17,8 @@ class AttentionQueryExplainer(SaliencyExplainer):
 
     This explainer relies on the attention distributions for all token,
     by mixing them through coefficients obtain through an attention distribution
+
+    NOTE: not used in paper, use at your own risk
     """
 
     layer_idx: int = None  # layer from which to use attention from

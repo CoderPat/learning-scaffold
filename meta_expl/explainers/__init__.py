@@ -72,9 +72,9 @@ def create_explainer(
     key: jax.random.PRNGKey,
     inputs: Any,
     state: Dict,
-    model_extras: Dict,
     explainer_type: str,
     explainer_args: Dict = {},
+    model_extras: Dict = {},
 ):
     """Creates an explainer"""
     explainer = EXPLAINER_REGISTRY[explainer_type](**explainer_args)
@@ -112,7 +112,7 @@ def load_explainer(
     explainer_dir: str,
     inputs: Any,
     state: Dict,
-    model_extras: Dict,
+    model_extras: Dict = {},
     suffix: str = "best",
 ):
     """
