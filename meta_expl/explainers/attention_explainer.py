@@ -22,7 +22,7 @@ class AttentionExplainer(SaliencyExplainer):
         int, str
     ] = "mean"  # corresponds to [CLS] in most tokenizations
     aggregator_dim: str = "row"
-    layer_idx: int = -1  # layer from which to use attention from
+    layer_idx: int = None  # layer from which to use attention from
     init_fn: Union[Callable, str] = "uniform"
     normalize_head_coeffs: bool = False
 
@@ -42,8 +42,9 @@ class AttentionExplainer(SaliencyExplainer):
         else:
             return self.init_fn
 
-    def logit_computation(self, inputs, state):
+    def logit_computation(self, inputs, state, **model_extras):
         init_fn = self.prepare_init()
+        # TODO: run model_fn in cases where we don't have state
         all_attentions = state["attentions"]
         head_attentions = (
             jnp.concatenate(all_attentions, axis=1)

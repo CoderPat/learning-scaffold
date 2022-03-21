@@ -212,7 +212,7 @@ def read_args():
     return args
 
 
-@partial(jax.jit, static_argnums=(0, 1, 2))
+@partial(jax.jit, static_argnums=(0, 1, 2), donate_argnums=(3, 4))
 def train_step(
     model: nn.Module,
     criterion,
@@ -238,7 +238,7 @@ def train_step(
     return loss, optax.apply_updates(params, updates), opt_state
 
 
-@partial(jax.jit, static_argnums=(0, 1, 2, 3, 4, 5, 6))
+@partial(jax.jit, static_argnums=(0, 1, 2, 3, 4, 5, 6), donate_argnums=(7, 8, 11))
 def train_step_with_teacher(
     task_type: str,
     student: nn.Module,
@@ -263,7 +263,12 @@ def train_step_with_teacher(
     if task_type == "classification":
         y_teacher = jnp.argmax(y_teacher, axis=-1)
 
-    teacher_expl, _ = teacher_explainer.apply(teacher_explainer_params, x, teacher_attn)
+    teacher_extras = {
+        "grad_fn": teacher.apply(teacher_params, x, method=teacher.embeddings_grad_fn)
+    }
+    teacher_expl, _ = teacher_explainer.apply(
+        teacher_explainer_params, x, teacher_attn, **teacher_extras
+    )
 
     def loss_fn(params):
         student_params, student_explainer_params = params
@@ -278,8 +283,13 @@ def train_step_with_teacher(
         main_loss = criterion(outputs, y_teacher)
 
         # compute explanations based on attention for both teacher and student
-        student_expl, s_extras = student_explainer.apply(
-            student_explainer_params, x, student_state
+        student_extras = {
+            "grad_fn": student.apply(
+                student_params, x, method=student.embeddings_grad_fn
+            )
+        }
+        student_expl, expl_extras = student_explainer.apply(
+            student_explainer_params, x, student_state, **student_extras
         )
         expl_loss = teacher_explainer.loss_fn(
             x,
@@ -287,7 +297,7 @@ def train_step_with_teacher(
             teacher_explainer=teacher_explainer,
             student_explanation=student_expl,
             teacher_explanation=teacher_expl,
-            **s_extras,
+            **expl_extras,
         )
 
         return main_loss + expl_coeff * expl_loss, {
@@ -308,7 +318,11 @@ def train_step_with_teacher(
     )
 
 
-@partial(jax.jit, static_argnums=(0, 1, 2, 3, 4, 5, 6, 7, 8))
+@partial(
+    jax.jit,
+    static_argnums=(0, 1, 2, 3, 4, 5, 6, 7, 8),
+    donate_argnums=(9, 10, 11, 12, 13, 14),
+)
 def metatrain_step(
     explicit_optimization: bool,
     task_type: str,
@@ -347,6 +361,14 @@ def metatrain_step(
     if task_type == "classification":
         y_teacher = jnp.argmax(y_teacher, axis=-1)
 
+    teacher_extras = {
+        "grad_fn": teacher.apply(
+            teacher_params,
+            train_x,
+            method=teacher.embeddings_grad_fn,
+        )
+    }
+
     def train_loss_fn(params, metaparams):
         student_params, student_explainer_params = params
         teacher_explainer_params = metaparams
@@ -360,12 +382,22 @@ def metatrain_step(
         )
         main_loss = criterion(outputs, y_teacher)
 
-        # compute explanations based on attention for both teacher and student
-        student_expl, s_extras = student_explainer.apply(
-            student_explainer_params, train_x, student_state
+        # compute explanations
+        student_extras = {
+            "grad_fn": student.apply(
+                student_params,
+                train_x,
+                method=student.embeddings_grad_fn,
+            )
+        }
+        student_expl, expl_extras = student_explainer.apply(
+            student_explainer_params,
+            train_x,
+            student_state,
+            **student_extras,
         )
         teacher_expl, _ = teacher_explainer.apply(
-            teacher_explainer_params, train_x, teacher_state
+            teacher_explainer_params, train_x, teacher_state, **teacher_extras
         )
         expl_loss = teacher_explainer.loss_fn(
             train_x,
@@ -373,7 +405,7 @@ def metatrain_step(
             teacher_explainer=teacher_explainer,
             student_explanation=student_expl,
             teacher_explanation=teacher_expl,
-            **s_extras,
+            **expl_extras,
         )
 
         return main_loss + expl_coeff * expl_loss
@@ -564,6 +596,11 @@ def main():
             state=dummy_state,
             explainer_type=args.teacher_explainer,
             explainer_args=args.teacher_explainer_params,
+            model_extras={
+                "grad_fn": teacher.apply(
+                    teacher_params, dummy_inputs, method=teacher.embeddings_grad_fn
+                )
+            },
         )
         embeddings = (
             teacher.extract_embeddings(teacher_params)
@@ -588,6 +625,11 @@ def main():
         state=dummy_state,
         explainer_type=args.explainer,
         explainer_args=args.explainer_params,
+        model_extras={
+            "grad_fn": classifier.apply(
+                params, dummy_inputs, method=classifier.embeddings_grad_fn
+            )
+        },
     )
 
     # load optimizer
@@ -778,7 +820,9 @@ def main():
         )
         if resets >= args.num_resets and valid_metrics[0] > best_metric:
             best_metric = valid_metrics[0]
-            best_params = params
+            # copy because of buffer donation
+            best_params = jax.tree_map(lambda a: jnp.array(a, copy=True), params)
+
             if args.model_dir is not None:
                 save_model(args.model_dir, classifier, params)
 

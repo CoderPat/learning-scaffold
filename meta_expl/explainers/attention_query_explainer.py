@@ -17,9 +17,11 @@ class AttentionQueryExplainer(SaliencyExplainer):
 
     This explainer relies on the attention distributions for all token,
     by mixing them through coefficients obtain through an attention distribution
+
+    NOTE: not used in paper, use at your own risk
     """
 
-    layer_idx: int = -1  # layer from which to use attention from
+    layer_idx: int = None  # layer from which to use attention from
     kq_dim: int = 1024
     init_fn: Union[Callable, str] = "uniform"
     parametrize_head_coeffs: bool = True
@@ -36,7 +38,7 @@ class AttentionQueryExplainer(SaliencyExplainer):
         else:
             return self.init_fn
 
-    def logit_computation(self, inputs, state):
+    def logit_computation(self, inputs, state, **model_extras):
         init_fn = self.prepare_init()
         hidden_states = state["hidden_states"][-1]
         attention_mask = inputs["attention_mask"]

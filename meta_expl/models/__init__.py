@@ -59,8 +59,8 @@ def create_model(
         # replace original parameters with pretrained parameters
         params = params.unfreeze()
 
-        assert "FlaxBertForSequenceClassificationModule_0" in params["params"]
-        params["params"]["FlaxBertForSequenceClassificationModule_0"] = model.params
+        assert "bert_module" in params["params"]
+        params["params"]["bert_module"] = model.params
         params = flax.core.freeze(params)
 
     elif arch == "xlm-r" or arch == "xlm-r-large":
@@ -80,8 +80,8 @@ def create_model(
         # replace original parameters with pretrained parameters
         params = params.unfreeze()
 
-        assert "FlaxRobertaForSequenceClassificationModule_0" in params["params"]
-        params["params"]["FlaxRobertaForSequenceClassificationModule_0"] = model.params
+        assert "roberta_module" in params["params"]
+        params["params"]["roberta_module"] = model.params
         params = flax.core.freeze(params)
 
     elif arch == "electra":
@@ -110,8 +110,8 @@ def create_model(
 
         # replace original parameters with pretrained parameters
         params = params.unfreeze()
-        assert "FlaxElectraForSequenceClassificationModule_0" in params["params"]
-        params["params"]["FlaxElectraForSequenceClassificationModule_0"] = model.params
+        assert "electra_module" in params["params"]
+        params["params"]["electra_module"] = model.params
         params = flax.core.freeze(params)
 
     elif arch == "vit-base":
@@ -127,8 +127,8 @@ def create_model(
 
         # replace original parameters with pretrained parameters
         params = params.unfreeze()
-        assert "FlaxViTForImageClassificationModule_0" in params["params"]
-        params["params"]["FlaxViTForImageClassificationModule_0"] = model.params
+        assert "vit_module" in params["params"]
+        params["params"]["vit_module"] = model.params
         params = flax.core.freeze(params)
 
     elif arch == "embedding":
@@ -249,8 +249,14 @@ def load_model(
     params = classifier.init(key, **inputs)
 
     # replace params with saved params
-    with open(os.path.join(model_dir, f"model_{suffix}.ckpt"), "rb") as f:
-        params = flax.serialization.from_bytes(params, f.read())
+    try:
+        with open(os.path.join(model_dir, f"model_{suffix}.ckpt"), "rb") as f:
+            params = flax.serialization.from_bytes(params, f.read())
+    except KeyError:
+        old_params = classifier.convert_to_old_checkpoint(params)
+        with open(os.path.join(model_dir, f"model_{suffix}.ckpt"), "rb") as f:
+            old_params = flax.serialization.from_bytes(old_params, f.read())
+        params = classifier.convert_to_new_checkpoint(old_params)
 
     # create dummy state for initalizing an explainer
     _, state = classifier.apply(
