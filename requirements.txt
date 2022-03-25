@@ -4,7 +4,6 @@ datasets
 optax
 pkbar
 wandb
-
 # Flax and Transfomers Fork
 git+ssh://git@github.com/CoderPat/transformers.git@unnormalized-attention#egg=transformers
 git+ssh://git@github.com/CoderPat/flax.git@custom-attention#egg=flax

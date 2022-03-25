@@ -16,7 +16,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("output_files", nargs="+", help="model output files")
     parser.add_argument("--metric", default="accuracy", help="metric to use")
-    parser.add_argument("--num-bootstraps", type=int, default=200)
+    parser.add_argument("--num-bootstraps", type=int, default=500)
     parser.add_argument("--sample-ratio", default=0.5)
     args = parser.parse_args()
 
@@ -53,7 +53,7 @@ def main():
             if metric == "person":
                 assert all(
                     onp.isclose(
-                        all_ground_truths[0][i], all_ground_truths[j][i], atol=1e-2
+                        all_ground_truths[0][i], all_ground_truths[j][i], atol=0.5e-2
                     )
                 )
             if metric == "accuracy":
@@ -61,11 +61,22 @@ def main():
 
     ground_truths = all_ground_truths[0]
 
+    metric_values = []
+    for sys in range(num_systems):
+        metric_values.append(
+            metric(jnp.array(all_outputs[sys]), jnp.array(ground_truths))
+        )
+    mean = onp.mean(metric_values)
+    median = onp.median(metric_values)
+    min_metric, max_metric = onp.min(metric_values), onp.max(metric_values)
+    std = onp.std(metric_values)
+    q75, q25 = onp.percentile(metric_values, [75, 25])
+
     ids = list(range(len(ground_truths)))
     num_points = int(len(ids) * args.sample_ratio)
     all_means = []
+
     for b in range(args.num_bootstraps):
-        print(b)
         reduced_ids = onp.random.choice(ids, size=num_points, replace=True)
         metric_value = 0
         for sys in range(num_systems):
@@ -78,12 +89,18 @@ def main():
             metric_value += metric(reduced_outputs, reduced_ground_truths)
         metric_value /= num_systems
         all_means.append(metric_value)
-    mean = onp.mean(all_means)
-    # median = onp.median(all_means)
+
+    bootstrapped_mean = onp.mean(all_means)
     conf_interval = onp.percentile(all_means, [2.5, 97.5])
-    print(
-        f"{args.metric} = {mean:.3f} +- [{conf_interval[1]:.3f}, {conf_interval[0]:.3f}]"
-    )
+
+    print(args.metric)
+    print(f"Mean: {mean}")
+    print(f"Median: {median}")
+    print(f"Min/Max: {min_metric}/{max_metric}")
+    print(f"q25/q75: {q25}/{q75}")
+    print(f"STD: {std}")
+    print(f"Bootstrapped Mean: {bootstrapped_mean}")
+    print(f"Confidence Interval: [{conf_interval[0]}, {conf_interval[1]}]")
 
 
 if __name__ == "__main__":

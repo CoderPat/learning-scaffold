@@ -43,8 +43,9 @@ class AttentionExplainer(SaliencyExplainer):
         else:
             return self.init_fn
 
-    def logit_computation(self, inputs, state):
+    def logit_computation(self, inputs, state, **model_extras):
         init_fn = self.prepare_init()
+        # TODO: run model_fn in cases where we don't have state
         all_attentions = state["attentions"]
         head_attentions = (
             jnp.concatenate(all_attentions, axis=1)
@@ -97,8 +98,8 @@ class AttentionExplainer(SaliencyExplainer):
             attentions = attentions[:, :, :, 0]
         else:
             raise ValueError(f"Unsupported aggregator_idx: {self.aggregator_idx}")
-        
+
         if self.head_idx is not None:
             return attentions[:, self.head_idx]
-        
+
         return jnp.einsum("h,bht->bt", headcoeffs, attentions)

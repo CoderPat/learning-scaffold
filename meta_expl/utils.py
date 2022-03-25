@@ -4,6 +4,7 @@ from typing import Iterator, Tuple, Union
 import flax.linen as nn
 import jax
 import jax.numpy as jnp
+
 from flax.training import common_utils
 
 from optax import (

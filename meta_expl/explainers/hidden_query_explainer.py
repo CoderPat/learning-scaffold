@@ -10,6 +10,8 @@ class HiddenQKExplainer(SaliencyExplainer):
     """
     Produces a saliency map through the use of hidden states by comparing them
     to a learnable query.
+
+    NOTE: not used in paper, use at your own risk
     """
 
     layer_idx: int = 0  # layer from which to use attention from

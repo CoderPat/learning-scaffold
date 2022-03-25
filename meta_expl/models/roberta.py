@@ -1,10 +1,14 @@
+import jax
+
 import flax.linen as nn
+import flax
 import jax.numpy as jnp
 
 from transformers import RobertaConfig
 from transformers.models.roberta.modeling_flax_roberta import (
     FlaxRobertaForSequenceClassificationModule,
 )
+
 
 from .scalar_mix import ScalarMix
 
@@ -15,7 +19,12 @@ class RobertaModel(nn.Module):
     num_labels: int
     config: RobertaConfig
 
-    @nn.compact
+    def setup(self):
+        self.roberta_module = FlaxRobertaForSequenceClassificationModule(
+            config=self.config
+        )
+        self.scalarmix = ScalarMix()
+
     def __call__(
         self,
         input_ids,
@@ -33,8 +42,7 @@ class RobertaModel(nn.Module):
 
         # TODO: we don't need to use the sequence classification module
         # keeping it for simplicity
-        roberta_module = FlaxRobertaForSequenceClassificationModule(config=self.config)
-        _, hidden_states, attentions = roberta_module(
+        _, hidden_states, attentions = self.roberta_module(
             input_ids,
             attention_mask=attention_mask,
             token_type_ids=token_type_ids,
@@ -46,14 +54,47 @@ class RobertaModel(nn.Module):
             return_dict=False,
         )
 
-        outputs = ScalarMix()(hidden_states, attention_mask)
-        outputs = roberta_module.classifier(
+        outputs = self.scalarmix(hidden_states, attention_mask)
+        outputs = self.roberta_module.classifier(
             outputs[:, None, :], deterministic=deterministic
         )
-        state = {"hidden_states": hidden_states, "attentions": attentions}
+        state = {
+            "outputs": outputs,
+            "hidden_states": hidden_states,
+            "attentions": attentions,
+        }
         return outputs, state
 
-    def extract_embeddings(self, params):
+    # define gradient over embeddings
+    def embeddings_grad_fn(
+        self,
+        inputs,
+    ):
+        def model_fn(word_embeddings, y):
+            _, hidden_states, _ = self.roberta_module.roberta.encoder(
+                word_embeddings,
+                inputs["attention_mask"],
+                head_mask=None,
+                output_hidden_states=True,
+                output_attentions=True,
+                unnorm_attention=True,
+                deterministic=True,
+                return_dict=False,
+            )
+            outputs = self.scalarmix(hidden_states, inputs["attention_mask"])
+            outputs = self.roberta_module.classifier(
+                outputs[:, None, :], deterministic=True
+            )
+            # we use sum over batch dimension since
+            # we need batched gradient and because embeddings
+            # on each sample are independent
+            # summing will just retrieve the batched gradient
+            return jnp.sum(outputs[jnp.arange(outputs.shape[0]), y], axis=0)
+
+        return jax.grad(model_fn)
+
+    @staticmethod
+    def extract_embeddings(params):
         return (
             params["params"]["FlaxRobertaForSequenceClassificationModule_0"]["roberta"][
                 "embeddings"
@@ -62,3 +103,33 @@ class RobertaModel(nn.Module):
                 "embeddings"
             ]["position_embeddings"]["embedding"],
         )
+
+    @staticmethod
+    def convert_to_new_checkpoint(old_params):
+        keymap = {
+            "FlaxRobertaForSequenceClassificationModule_0": "roberta_module",
+            "ScalarMix_0": "scalarmix",
+        }
+        new_params = {"params": {}}
+        for key, value in old_params["params"].items():
+            if key in keymap:
+                new_params["params"][keymap[key]] = value
+            else:
+                new_params["params"][key] = value
+
+        return flax.core.freeze(new_params)
+
+    @staticmethod
+    def convert_to_old_checkpoint(new_params):
+        keymap = {
+            "roberta_module": "FlaxRobertaForSequenceClassificationModule_0",
+            "scalarmix": "ScalarMix_0",
+        }
+        old_params = {"params": {}}
+        for key, value in new_params["params"].items():
+            if key in keymap:
+                old_params["params"][keymap[key]] = value
+            else:
+                old_params["params"][key] = value
+
+        return flax.core.freeze(old_params)
