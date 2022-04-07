@@ -33,7 +33,7 @@ def load_data(
 
     data = []
     for split in ("train", "validation", "test"):
-        data.extends(list(hf_dataset[split]))
+        data.extend(list(hf_dataset[split]))
 
     return data
 
