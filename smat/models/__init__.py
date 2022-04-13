@@ -17,7 +17,7 @@ from transformers import (
     FlaxViTForImageClassification,
 )
 
-from meta_expl.utils import is_jsonable
+from smat.utils import is_jsonable
 
 from .vit import ViTModel
 from .bert import BertModel
@@ -34,11 +34,24 @@ def create_model(
     num_classes: int,
     vocab_size: int = None,
     arch: str = "bert",
-    batch_size: int = 16,
     max_len: int = 512,
     embeddings_dim: int = 256,
     embeddings: jnp.array = None,
 ):
+    """
+    Creates a model
+
+    Args:
+        key: a JAX random key
+        inputs: a dictionary of inputs to the model
+        num_classes: the number of classes in the dataset
+        vocab_size: the size of the vocabulary
+        arch: the architecture of the model
+        max_len: the maximum length of the input
+        embeddings_dim: the dimension of the embeddings
+        embeddings: a numpy array of embeddings, used to initialize the embeddings for `embeddings`
+
+    """
     # instantiate model parameters
 
     if arch == "mbert":
@@ -204,8 +217,6 @@ def save_model(
 def load_model(
     model_dir: str,
     inputs: Dict[str, Any],
-    batch_size: int = 16,
-    max_len: int = 256,
     suffix: str = "best",
 ):
     """

@@ -2,7 +2,6 @@ import json
 import os
 from abc import ABCMeta
 from typing import Any, Callable, Dict, Union
-from functools import partial
 
 import importlib
 
@@ -13,7 +12,7 @@ import jax.numpy as jnp
 from entmax_jax import entmax15, sparsemax
 from entmax_jax.losses import entmax_loss, softmax_loss, sparsemax_loss
 
-from meta_expl.utils import is_jsonable, topk_softmax
+from meta_expl.utils import is_jsonable
 
 EXPLAINER_REGISTRY = {}
 
@@ -76,7 +75,17 @@ def create_explainer(
     explainer_args: Dict = {},
     model_extras: Dict = {},
 ):
-    """Creates an explainer"""
+    """
+    Creates an explainer
+
+    Args:
+        key: a JAX random key
+        inputs: the inputs to the model
+        state: the state of the model after running a forward pass
+        explainer_type: the type of explainer to create
+        explainer_args: the arguments to pass to the explainer
+        model_extras: extra model information needed for the explainer. Explainer specific
+    """
     explainer = EXPLAINER_REGISTRY[explainer_type](**explainer_args)
     # instantiate model parameters
     params = explainer.init(key, inputs, state, **model_extras)
@@ -89,6 +98,12 @@ def save_explainer(
     """
     Serializes an explainer.
     NOTE: that this only saves serializable arguments
+
+    Args:
+        model_dir: the directory to save the explainer to
+        explainer: the explainer (config) to save
+        params: the parameters of the explainer to save
+        suffix: the suffix to append to the saved file
     """
     if not os.path.exists(model_dir):
         os.makedirs(model_dir)
@@ -117,6 +132,13 @@ def load_explainer(
 ):
     """
     Loads a serialized explainer
+
+    Args:
+        explainer_dir: the directory to load the explainer from
+        inputs: the inputs to the model
+        state: the state of the model after running a forward pass
+        model_extras: extra model information needed for the explainer. Explainer specific
+        suffix: the suffix used when saving the explainer
     """
     # load explainer object
     with open(os.path.join(explainer_dir, "config.json")) as f:
@@ -142,6 +164,9 @@ class SaliencyExplainer(Explainer, metaclass=ABCMeta):
     Represents and explainer that produces *saliency maps* as explanations
 
     Saliency maps are probability distributions over the input tokens
+
+    Args:
+        normalizer_fn: a function that normalizes the saliency "logits"
     """
 
     normalizer_fn: Union[Callable, str] = "softmax"
@@ -153,13 +178,20 @@ class SaliencyExplainer(Explainer, metaclass=ABCMeta):
             return sparsemax
         elif self.normalizer_fn == "entmax":
             return entmax15
-        elif self.normalizer_fn == "topk_softmax":
-            return partial(topk_softmax, topk=0.25)
         else:
             return self.normalizer_fn
 
     @nn.compact
     def __call__(self, inputs, state, **model_extras):
+        """
+        Computes the (normalized) saliency map
+
+        Args:
+            inputs: original inputs to the model. Currently it assumes a HF model/tokenizer
+            state: state of the model. Each explainer will require different state
+            model_extras: extra model information needed for the explainer. Explainer specific
+        """
+
         normalizer_fn = self.prepare_normalizer_fn()
         logits = self.logit_computation(inputs, state, **model_extras)
         bias = (
@@ -183,7 +215,9 @@ class SaliencyExplainer(Explainer, metaclass=ABCMeta):
         student_explanation,
         **extras,
     ):
-        """loss for explanations"""
+        """
+        loss for explanations
+        """
         if (
             student_explainer.normalizer_fn == "sparsemax"
             and teacher_explainer.normalizer_fn == "sparsemax"

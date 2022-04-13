@@ -3,14 +3,16 @@ from functools import partial
 import jax
 
 
-def debug_foriloop(s, e, body, vars):
-    for i in range(s, e):
-        vars = body(i, vars)
-    return vars
-
-
 def aprox_inverse_hvp(df, primals, cotangent, n_iters=3, lr=0.1):
-    """ """
+    """
+    Computes the approximate inverse of the Hessian-vector product of `f`.
+    It receives the *gradient* function `df`, and the primals and cotangents.
+
+    `n_iters` is the number of terms of the von-neumann series to compute.
+    `lr` is the learning rate used for the inner optimization.
+
+    WARNING: Not used in the paper.
+    """
 
     @partial(jax.jit, static_argnums=(0, 3))
     def _aprox_inverse_hvp(df, primals, cotangent, n_iters, lr):
@@ -25,7 +27,6 @@ def aprox_inverse_hvp(df, primals, cotangent, n_iters=3, lr=0.1):
             return v, p
 
         v, p = jax.lax.fori_loop(0, n_iters, loop_body, (v, p))
-        # v, p = debug_foriloop(0, n_iters, loop_body, (v, p))
         return p
 
     return _aprox_inverse_hvp(df, primals, cotangent, n_iters, lr)
@@ -33,7 +34,9 @@ def aprox_inverse_hvp(df, primals, cotangent, n_iters=3, lr=0.1):
 
 def hypergrad(train_loss, valid_loss, params, metaparams, lr=1e-4):
     """
-    Assumes `train_loss(params, metaparams)` and `valid_loss(params)`
+    Computes the gradients of the validation loss function with respect to the (meta-)parameters.
+
+    See (https://arxiv.org/abs/1911.02590) for more details
     """
     v1 = jax.grad(valid_loss)(params)
     df = jax.grad(train_loss)

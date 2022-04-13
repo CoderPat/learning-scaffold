@@ -23,13 +23,13 @@ pip install -r requirements
 To train a teacher model run
 
 ```bash
-python meta_expl/train.py --model-dir $teacher_dir
+python smat/train.py --model-dir $teacher_dir
 ```
 
 To train a student model learning from the  with `num_samples` training examples, run
 
 ```bash
-python meta_expl/train.py \
+python smat/train.py \
       --model-type student \
       --num-examples $num_examples \
       --teacher-dir $teacher_dir 

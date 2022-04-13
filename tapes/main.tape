@@ -18,7 +18,7 @@ task TrainTeacher
         train_params+="--clip-grads 1.0 "
         train_params+="--warmup-steps 4000 "
     fi
-    python $repo/meta_expl/train.py \
+    python $repo/smat/train.py \
       --wandb $wandb_project \
       --task $task \
       --arch $teacher_arch \
@@ -63,9 +63,7 @@ task TrainStudent
     :: metalearn=@
     :: meta_interval=@
     :: meta_lr=@
-    :: meta_explicit=@
-    :: meta_warmup=@
-    :: num_resets=@
+    :: implicit_differentiation=@
     :: wandb_project=@
     :: seed=@
 {
@@ -108,7 +106,7 @@ task TrainStudent
     export HF_DATASETS_CACHE=/scratch/pfernand/hf_datasets_cache
     
     # TODO: add back number of epochs
-    python $repo/meta_expl/train.py \
+    python $repo/smat/train.py \
       --wandb $wandb_project \
       --task $task \
       --setup $([ "$metalearn" = true ] && echo "learnable_teacher" || echo "static_teacher") \
@@ -153,7 +151,7 @@ task AverageResults
   :: repo=@
   :: metric=@
 {
-  python $repo/meta_expl/bootstrap_eval.py \
+  python $repo/smat/bootstrap_eval.py \
     $test_outputs \
     --metric $metric > result
 
@@ -170,10 +168,8 @@ task AverageResults
 summary EvalSummary {
   of AverageResults > PaperStr MeanSim MedianSim MinMaxSim IQDSim STDSim BootstrapMeanSim ConfIntervalSim {
     cp $mean_metric $MeanSim
-    #cat $median_metric | sed -r "s/0\.([0-9]{4})[0-9]*/.\1/" > $MedianSim
     cat $median_metric | sed -r "s/0\.([0-9]{2})([0-9]{2})[0-9]*/\1.\2/" > $MedianSim
     cp $minmax_metric $MinMaxSim
-    #cat $iqd_metric | sed -r "s/0\.([0-9]{4})[0-9]*\/0\.([0-9]{4})[0-9]*/\[.\1:.\2\]/" > $IQDSim
     cat $iqd_metric | sed -r "s/0\.([0-9]{2})([0-9]{2})[0-9]*\/0\.([0-9]{2})([0-9]{2})[0-9]*/\[\1.\2:\3.\4\]/" > $IQDSim
     paste -d '+' $MedianSim $IQDSim > $PaperStr
     cp $std_metric $STDSim

@@ -1,4 +1,4 @@
-from typing import Callable, Union
+from typing import Callable, Union, Dict, Any
 
 import jax
 import flax.linen as nn
@@ -13,18 +13,20 @@ from . import SaliencyExplainer, register_explainer
 class AttentionExplainer(SaliencyExplainer):
     """
     Produces a saliency map for models that have attention mechanisms
+    This attention mechanism relies on the attention distributions of model
 
-    This attention mechanism relies on the attention distributions for a single token,
-    the attention aggregator (for example the CLS)
+    Args:
+        normalize_head_coeffs: normalization function for the head coefficients
+        aggregator_idx: index of the aggregator to use. "mean" or an integer
+        layer_idx: index of the layer to use. None for all layers
+        init_fn: initializer for the head coefficients. defaults to uniform over all heads
+
     """
 
-    aggregator_idx: Union[
-        int, str
-    ] = "mean"  # corresponds to [CLS] in most tokenizations
-    aggregator_dim: str = "row"
-    layer_idx: int = None  # layer from which to use attention from
+    normalize_head_coeffs: bool = "sparsemax"
+    aggregator_idx: Union[int, str] = "mean"
+    layer_idx: int = None
     init_fn: Union[Callable, str] = "uniform"
-    normalize_head_coeffs: bool = False
 
     def prepare_init(self):
         """TODO: replace this with getter"""
@@ -33,7 +35,7 @@ class AttentionExplainer(SaliencyExplainer):
         elif self.init_fn == "lecun_normal":
             return nn.initializers.lecun_normal()
         elif self.init_fn[:5] == "head_":
-
+            # Uses a single head
             def init(_, shape):
                 coefs = jnp.ones(shape) * -1e10
                 return coefs.at[int(self.init_fn[5:])].set(1.0)
@@ -42,9 +44,18 @@ class AttentionExplainer(SaliencyExplainer):
         else:
             return self.init_fn
 
-    def logit_computation(self, inputs, state, **model_extras):
+    def logit_computation(
+        self, inputs: Dict[str, Any], state: Dict[str, Any], **model_extras
+    ):
+        """
+        Computes the saliency logits/energy of the model's prediction
+
+        Args:
+            inputs: original inputs to the model. Currently it assumes a HF model/tokenizer
+            state: state of the model. Needs to have "attentions"
+
+        """
         init_fn = self.prepare_init()
-        # TODO: run model_fn in cases where we don't have state
         all_attentions = state["attentions"]
         head_attentions = (
             jnp.concatenate(all_attentions, axis=1)
@@ -62,12 +73,15 @@ class AttentionExplainer(SaliencyExplainer):
                 headcoeffs = sparsemax(headcoeffs)
             elif self.normalize_head_coeffs == "entmax":
                 headcoeffs = entmax15(headcoeffs)
-            elif self.normalize_head_coeffs == "softmax_hot":
-                headcoeffs = nn.softmax(headcoeffs * 10)
-            else:
+            elif self.normalize_head_coeffs == "softmax":
                 headcoeffs = nn.softmax(headcoeffs)
+            else:
+                raise ValueError(
+                    f"Unknown normalization method: {self.normalize_head_coeffs}"
+                )
 
         if isinstance(self.aggregator_idx, int):
+            # collect attention logits from a single row
             if self.aggregator_dim == "row":
                 attentions = head_attentions[:, :, self.aggregator_idx, :]
             elif self.aggregator_dim == "col":
@@ -75,6 +89,7 @@ class AttentionExplainer(SaliencyExplainer):
             else:
                 raise ValueError("Unknown aggregator_dim")
         elif self.aggregator_idx == "mean":
+            # collect attention logits from all rows
             coeffs = (
                 jax.lax.select(
                     inputs["attention_mask"] > 0,
@@ -88,13 +103,7 @@ class AttentionExplainer(SaliencyExplainer):
                 )
             )
             coeffs = coeffs / jnp.sum(coeffs, axis=-1, keepdims=True)
-            if self.aggregator_dim == "row":
-                attentions = jnp.einsum("bhcr,bc->bhr", head_attentions, coeffs)
-            if self.aggregator_dim == "col":
-                attentions = jnp.einsum("bhrc,bc->bhr", head_attentions, coeffs)
-        elif self.aggregator_idx == "debug_uniform":
-            attentions = jnp.ones_like(head_attentions)
-            attentions = attentions[:, :, :, 0]
+            attentions = jnp.einsum("bhcr,bc->bhr", head_attentions, coeffs)
         else:
             raise ValueError(f"Unsupported aggregator_idx: {self.aggregator_idx}")
 

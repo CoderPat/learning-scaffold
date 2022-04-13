@@ -59,9 +59,7 @@ global {
     )
     meta_lr=(MetaLR: 1e-3 5e-3 1e-4 2e-4 5e-4 1e-5 5e-5)
     meta_interval=1
-    meta_explicit=true
-    meta_warmup=0
-    num_resets=0
+    implicit_differentiation=false
 
     seed=(Seed: 0 9 11 30 69)
 
