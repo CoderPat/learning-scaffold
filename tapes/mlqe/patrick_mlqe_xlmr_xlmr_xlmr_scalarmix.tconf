@@ -7,19 +7,19 @@ global {
 
     task="mlqe"
     task_params=""
-    num_examples=(NumExamples: 4100 1050 2100 8400)
+    num_examples=(NumExamples: 4100 2100 8400)
     metric="pearson"
 
     # models and explainers parameters
     teacher_arch=xlm-r
     student_arch=xlm-r
-    init_embed=true
+    init_embed=false
 
     teacher_explainer=(
         TeacherExplainer:
             attention="attention_explainer"
-            attention_query="attention_query_explainer"
-            hidden_qk="hidden_qk_explainer"
+            gradient_input="gradient_input_explainer"
+            integrated_gradients="integrated_gradients_explainer"
     )
     student_explainer=attention_explainer
 
@@ -32,8 +32,16 @@ global {
     student_aggregator_dim="\"row\""
     parametrize_head_coeffs=true
     normalize_head_coeffs=(NormalizeHeadCoeffs: sparsemax="\"sparsemax\"" entmax="\"entmax\"" softmax=true softmax_hot="\"softmax_hot\"" none=false)
-    teacher_layer_idx=null
-    student_layer_idx=null
+    teacher_layer_idx=(
+        BestLayer:
+            false=null
+            true=11
+    )
+    student_layer_idx=(
+        BestLayer:
+            false=null
+            true=11
+    )
     aggregator_normalizer_fn=sparsemax
 
     # optimization paramaters
@@ -41,7 +49,7 @@ global {
     num_epochs=""
     batch_size=16
     lr=5e-3
-    kld_coeff=(KLDCoeff: 0 5)
+    kld_coeff=(KLDCoeff: 0 0.2 1 5)
     patience=5
 
     # (meta) optimization parameters
@@ -56,11 +64,11 @@ global {
     meta_warmup=0
     num_resets=(NumResets: 0 100 200 300)
 
-    seed=(Seed: 0 9 11) #  30 69)
+    seed=(Seed: 0 9 11 30 69)
 
     wandb_project="meta-expl-mlqe-xlmr-xlmr-scalarmix"
 
-    exclude="tir-0-[7,9,11,13,15,17,19,32,36],tir-0-3,tir-1-7,tir-1-11"
+    exclude="tir-0-[7,9,11,13,15,17,19,32,36],tir-0-3,tir-1-11,tir-1-13,tir-1-18"
     submitter=slurm
 }
 
@@ -81,7 +89,21 @@ plan MetaTrain {
     reach AverageResults via (KLDCoeff: 5) * (MetaLearn: true) * (TeacherExplainer: attention) * (MetaLR: 5e-4) * (NormalizeHeadCoeffs: softmax_hot)
 }
 
-plan SingleHead {
-    reach AverageResults via (KLDCoeff: 5) * (TeacherInitFn: head_113)
+plan GradientExplainers {
+    reach AverageResults via (NumExamples: 4100) * (KLDCoeff: 0.2 1 5) * (TeacherExplainer: gradient_input integrated_gradients) 
+}
+
+plan PaperSimulabilityResults {
+    reach AverageResults via (NumExamples: 4100 2100 8400) * (KLDCoeff: 0)
+    reach AverageResults via (NumExamples: 4100 2100 8400) * (KLDCoeff: 5)
+    reach AverageResults via (NumExamples: 4100 2100 8400) * (KLDCoeff: 5) * (BestLayer: true)
+    reach AverageResults via (NumExamples: 4100 2100 8400) * (KLDCoeff: 0.2) * (TeacherExplainer: gradient_input integrated_gradients)
+    reach AverageResults via (NumExamples: 4100 2100 8400) * (KLDCoeff: 5) * (MetaLearn: true) * (MetaLR: 2e-4)
+}
+
+plan PaperHeadsNormalizerResults {
+    reach AverageResults via (KLDCoeff: 0)
+    reach AverageResults via (KLDCoeff: 5) * (BestLayer: *) * (NormalizeHeadCoeffs: sparsemax softmax entmax none)
+    reach AverageResults via (KLDCoeff: 5) * (MetaLearn: true) * (MetaLR: 2e-4) * (NormalizeHeadCoeffs: sparsemax softmax entmax none)
 }
 
