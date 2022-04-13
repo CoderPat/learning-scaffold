@@ -1,6 +1,6 @@
-# Meta-learning Explanations
+# Learning to Scaffold: Optimizing Model Explanations for Teaching
 
-This repository contains code exploring meta-learning explainers
+This repository contains source code for the paper *[Learning to Scaffold: Optimizing Model Explanations for Teaching]()*.
 
 ## Requirements
 
@@ -17,6 +17,8 @@ Other requirements can be install by running
 ```bash
 pip install -r requirements
 ```
+
+## *NEW*: Quickly Train Explainers for you Model
 
 ## Running
 
