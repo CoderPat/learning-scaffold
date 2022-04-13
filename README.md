@@ -18,7 +18,7 @@ Other requirements can be install by running
 pip install -r requirements
 ```
 
-## *NEW*: Quickly Train Explainers for you Model
+## **NEW**: Quickly train explainers for you model
 
 ## Running
 
