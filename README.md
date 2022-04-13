@@ -1,4 +1,4 @@
-# Learning to Scaffold: Optimizing Model Explanations for Teaching
+# Scaffold-Maximizing Training (SMAT)
 
 This repository contains source code for the paper *[Learning to Scaffold: Optimizing Model Explanations for Teaching]()*.
 
