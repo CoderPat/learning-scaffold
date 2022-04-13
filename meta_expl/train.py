@@ -321,7 +321,7 @@ def train_step_with_teacher(
 @partial(
     jax.jit,
     static_argnums=(0, 1, 2, 3, 4, 5, 6, 7, 8),
-    donate_argnums=(9, 10, 11, 12, 13, 14),
+    donate_argnums=(12, 14),
 )
 def metatrain_step(
     explicit_optimization: bool,

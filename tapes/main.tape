@@ -143,6 +143,11 @@ task AverageResults
   < results=@TrainStudent[Seed:*]
   < test_outputs=@TrainStudent[Seed:*]
   > mean_metric
+  > median_metric
+  > minmax_metric
+  > iqd_metric
+  > std_metric
+  > bootstrap_mean_metric
   > confint_metric
   :: .submitter=slurm .mem=8000 .cpus=2 .time=0
   :: repo=@
@@ -152,14 +157,27 @@ task AverageResults
     $test_outputs \
     --metric $metric > result
 
-  cat result | grep -oP "$metric = \K[0-9]+\.[0-9]+" > $mean_metric
-  cat result | grep -oP "$metric = .*\K\[.*\]" > $confint_metric
+  cat result | grep -oP "^Mean: \K[0-9]+\.[0-9]+" > $mean_metric
+  cat result | grep -oP "^Median: \K[0-9]+\.[0-9]+" > $median_metric
+  cat result | grep -oP "^Min/Max: \K.*" > $minmax_metric
+  cat result | grep -oP "^STD: \K.*" > $std_metric
+  cat result | grep -oP "^q25/q75: \K.*" > $iqd_metric
+  cat result | grep -oP "^Bootstrapped Mean: \K.*" > $bootstrap_mean_metric
+  cat result | grep -oP "^Confidence Interval: .*\K\[.*\]" > $confint_metric
   
 }
 
 summary EvalSummary {
-  of AverageResults > MeanSim ConfIntervalSim {
+  of AverageResults > PaperStr MeanSim MedianSim MinMaxSim IQDSim STDSim BootstrapMeanSim ConfIntervalSim {
     cp $mean_metric $MeanSim
+    #cat $median_metric | sed -r "s/0\.([0-9]{4})[0-9]*/.\1/" > $MedianSim
+    cat $median_metric | sed -r "s/0\.([0-9]{2})([0-9]{2})[0-9]*/\1.\2/" > $MedianSim
+    cp $minmax_metric $MinMaxSim
+    #cat $iqd_metric | sed -r "s/0\.([0-9]{4})[0-9]*\/0\.([0-9]{4})[0-9]*/\[.\1:.\2\]/" > $IQDSim
+    cat $iqd_metric | sed -r "s/0\.([0-9]{2})([0-9]{2})[0-9]*\/0\.([0-9]{2})([0-9]{2})[0-9]*/\[\1.\2:\3.\4\]/" > $IQDSim
+    paste -d '+' $MedianSim $IQDSim > $PaperStr
+    cp $std_metric $STDSim
+    cp $bootstrap_mean_metric $BootstrapMeanSim
     cp $confint_metric $ConfIntervalSim
   }
 }
