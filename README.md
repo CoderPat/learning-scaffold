@@ -2,6 +2,11 @@
 
 This repository contains source code for the paper *[Learning to Scaffold: Optimizing Model Explanations for Teaching]()*.
 
+<hr />
+
+> **Abstract:** *While many recent works propose methods for extracting explanations from opaque machine learning models, the lack of clear goals for these methods make it hard to not only evaluate them but also design new, better ones. In this work, we introduce a framework for automatically learning to extract explanations from a teacher model by directly optimizing them to help students learn to simulate said teacher, which we name SMAT, and propose a concrete solution based on higher-order differentiation. We also propose a method for extracting explanations from attention-based models that can be directly optimized with our framework. We train models on text classification, quality estimation and image classification tasks and find that students trained with explanations extracted with our framework are able to simulate the teacher much more effectively than ones trained with previously proposed methods. Through human annotations and a user study, we also find that these learned explanations more closely align with how humans would explain their decisions in these tasks.*
+<hr />
+
 ## Requirements
 
 The code is based on the [JAX](https://github.com/google/jax).
