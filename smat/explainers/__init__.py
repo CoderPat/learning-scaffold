@@ -12,7 +12,7 @@ import jax.numpy as jnp
 from entmax_jax import entmax15, sparsemax
 from entmax_jax.losses import entmax_loss, softmax_loss, sparsemax_loss
 
-from meta_expl.utils import is_jsonable
+from smat.utils import is_jsonable
 
 EXPLAINER_REGISTRY = {}
 
@@ -249,4 +249,4 @@ class SaliencyExplainer(Explainer, metaclass=ABCMeta):
 
 # automatically import any Python files in the explainers/ directory
 explainers_dir = os.path.dirname(__file__)
-import_explainers(explainers_dir, "meta_expl.explainers")
+import_explainers(explainers_dir, "smat.explainers")

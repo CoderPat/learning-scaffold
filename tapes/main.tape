@@ -45,12 +45,9 @@ task TrainStudent
     :: teacher_normalizer_fn=@
     :: student_normalizer_fn=@
     :: teacher_init_fn=@
-    :: parametrize_head_coeffs=@
     :: normalize_head_coeffs=@
     :: teacher_aggregator_idx=@
     :: student_aggregator_idx=@
-    :: teacher_aggregator_dim=@
-    :: student_aggregator_dim=@
     :: teacher_layer_idx=@
     :: student_layer_idx=@
     :: aggregator_normalizer_fn=@
@@ -70,16 +67,12 @@ task TrainStudent
     # define teacher_explainer params
     teacher_explainer_args="\"normalizer_fn\": \"$teacher_normalizer_fn\""
     if [ "$teacher_explainer" == "attention_query_explainer" ]; then
-      teacher_explainer_args+=", \"parametrize_head_coeffs\": $parametrize_head_coeffs"
       teacher_explainer_args+=", \"normalize_head_coeffs\": $normalize_head_coeffs"
-      teacher_explainer_args+=", \"aggregator_dim\": $teacher_aggregator_dim"
       teacher_explainer_args+=", \"init_fn\": \"$teacher_init_fn\""
       teacher_explainer_args+=", \"layer_idx\": $teacher_layer_idx"
-      teacher_explainer_args+=", \"aggregator_normalizer_fn\": \"$aggregator_normalizer_fn\""
     elif [ "$teacher_explainer" == "attention_explainer" ]; then
       teacher_explainer_args+=", \"normalize_head_coeffs\": $normalize_head_coeffs"
       teacher_explainer_args+=", \"aggregator_idx\": $teacher_aggregator_idx"
-      teacher_explainer_args+=", \"aggregator_dim\": $teacher_aggregator_dim"
       teacher_explainer_args+=", \"init_fn\": \"$teacher_init_fn\""
       teacher_explainer_args+=", \"layer_idx\": $teacher_layer_idx"
     fi
@@ -88,15 +81,11 @@ task TrainStudent
     # define student_explainer params
     student_explainer_args="\"normalizer_fn\": \"$student_normalizer_fn\""
     if [ "$student_explainer" == "attention_query_explainer" ]; then
-      student_explainer_args+=", \"parametrize_head_coeffs\": $parametrize_head_coeffs"
       student_explainer_args+=", \"normalize_head_coeffs\": $normalize_head_coeffs}"
-      student_explainer_args+=", \"aggregator_dim\": $student_aggregator_dim"
       student_explainer_args+=", \"layer_idx\": $student_layer_idx"
-      student_explainer_args+=", \"aggregator_normalizer_fn\": \"$aggregator_normalizer_fn\""
     elif [ "$student_explainer" == "attention_explainer" ]; then
       student_explainer_args+=", \"normalize_head_coeffs\": $normalize_head_coeffs"
       student_explainer_args+=", \"aggregator_idx\": $student_aggregator_idx"
-      student_explainer_args+=", \"aggregator_dim\": $student_aggregator_dim"
       student_explainer_args+=", \"layer_idx\": $student_layer_idx"
     fi
     student_explainer_args="{$student_explainer_args}"
@@ -127,7 +116,7 @@ task TrainStudent
       --meta-lr $meta_lr \
       --meta-warmup $meta_warmup \
       --num-resets $num_resets \
-      $([ "$meta_explicit" = true ] && echo "--meta-explicit" || echo "") \
+      $([ "$implicit_differentiation" = true ] && echo "--implicit-differentiation" || echo "") \
       --batch-size $batch_size \
       --model-dir $student_dir \
       --teacher-explainer-dir $teacher_expl_dir \

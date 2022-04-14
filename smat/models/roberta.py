@@ -1,19 +1,27 @@
 import jax
 
-import flax.linen as nn
 import flax
 import jax.numpy as jnp
 
-from transformers import RobertaConfig
+from transformers import RobertaConfig, FlaxRobertaForSequenceClassification
 from transformers.models.roberta.modeling_flax_roberta import (
     FlaxRobertaForSequenceClassificationModule,
 )
 
 
+from . import register_model, WrappedModel
 from .scalar_mix import ScalarMix
 
 
-class RobertaModel(nn.Module):
+@register_model(
+    "roberta",
+    architectures={
+        "xlm-r": {"identifier": "xlm-roberta-base"},
+        "xlm-r-large": {"identifier": "xlm-roberta-large"},
+    },
+    config_cls=RobertaConfig,
+)
+class RobertaModel(WrappedModel):
     """A Roberta-based classification module"""
 
     num_labels: int
@@ -133,3 +141,33 @@ class RobertaModel(nn.Module):
                 old_params["params"][key] = value
 
         return flax.core.freeze(old_params)
+
+    @classmethod
+    def initialize_new_model(
+        cls,
+        key,
+        inputs,
+        num_classes,
+        identifier="xlm-roberta-base",
+        **kwargs,
+    ):
+        model = FlaxRobertaForSequenceClassification.from_pretrained(
+            identifier,
+            num_labels=num_classes,
+        )
+
+        classifier = RobertaModel(
+            num_labels=num_classes,
+            config=model.config,
+        )
+        params = classifier.init(key, **inputs)
+
+        # replace original parameters with pretrained parameters
+        # replace original parameters with pretrained parameters
+        params = params.unfreeze()
+
+        assert "roberta_module" in params["params"]
+        params["params"]["roberta_module"] = model.params
+        params = flax.core.freeze(params)
+
+        return classifier, params

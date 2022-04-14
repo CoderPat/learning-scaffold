@@ -23,14 +23,11 @@ global {
     )
     student_explainer=attention_explainer
 
-    teacher_normalizer_fn=(TeacherNormalizerFn: softmax topk_softmax)
+    teacher_normalizer_fn=softmax
     student_normalizer_fn=softmax
-    teacher_init_fn=(TeacherInitFn: uniform head_113)
+    teacher_init_fn=uniform
     teacher_aggregator_idx="\"mean\""
     student_aggregator_idx="\"mean\""
-    teacher_aggregator_dim="\"row\""
-    student_aggregator_dim="\"row\""
-    parametrize_head_coeffs=true
     normalize_head_coeffs=(NormalizeHeadCoeffs: sparsemax="\"sparsemax\"" entmax="\"entmax\"" softmax=true softmax_hot="\"softmax_hot\"" none=false)
     teacher_layer_idx=(
         BestLayer:

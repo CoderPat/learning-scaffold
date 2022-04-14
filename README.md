@@ -1,6 +1,6 @@
 # Scaffold-Maximizing Training (SMAT)
 
-This repository contains source code for the paper *[Learning to Scaffold: Optimizing Model Explanations for Teaching]()*.
+This repository is the official implementation for the paper *[Learning to Scaffold: Optimizing Model Explanations for Teaching]()*.
 
 <hr />
 
@@ -30,14 +30,30 @@ pip install -r requirements
 To train a teacher model run
 
 ```bash
-python smat/train.py --model-dir $teacher_dir
+python smat/train.py \
+      --setup no_teacher \
+      --task $task \
+      --arch $arch \
+      --model-dir $teacher_dir
+
 ```
 
-To train a student model learning from the  with `num_samples` training examples, run
+To train a student model learning from this teacher model  with `num_samples` training examples, run
 
 ```bash
 python smat/train.py \
-      --model-type student \
+      --setup static_teacher \
+      --task $task \
+      --arch $arch \
+      --num-examples $num_examples \
+      --teacher-dir $teacher_dir 
+```
+
+To train a student model learning from the trained teacher with `num_samples` training examples, run
+
+```bash
+python smat/train.py \
+      --setup static_teacher \
       --num-examples $num_examples \
       --teacher-dir $teacher_dir 
 ```

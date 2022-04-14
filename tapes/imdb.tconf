@@ -30,7 +30,7 @@ global {
     teacher_aggregator_dim="\"row\""
     student_aggregator_dim="\"row\""
     parametrize_head_coeffs=true
-    normalize_head_coeffs=(NormalizeHeadCoeffs: sparsemax="\"sparsemax\"" entmax="\"entmax\"" softmax=true none=false)
+    normalize_head_coeffs="\"sparsemax\""
     teacher_layer_idx=(
         BestLayer: 
             false=null 

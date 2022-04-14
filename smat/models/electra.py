@@ -1,6 +1,6 @@
-import flax.linen as nn
 import jax.numpy as jnp
-from transformers import ElectraConfig
+
+from transformers import ElectraConfig, FlaxElectraForSequenceClassification
 from transformers.models.electra.modeling_flax_electra import (
     FlaxElectraForSequenceClassificationModule,
 )
@@ -8,46 +8,21 @@ from transformers.models.electra.modeling_flax_electra import (
 import jax
 import flax
 
+from . import register_model, WrappedModel
 from .scalar_mix import ScalarMix
 
 
-class ElectraModel(nn.Module):
+@register_model("electra", config_cls=ElectraConfig)
+class ElectraModel(WrappedModel):
     """A Electra-based classification module"""
 
     num_labels: int
-    vocab_size: int
-    embedding_size: int
-    hidden_size: int
-    type_vocab_size: int
-    max_length: int
-    num_encoder_layers: int
-    num_heads: int
-    head_size: int
-    intermediate_size: int
-    hidden_act: str = "gelu"
-    dropout_rate: float = 0.0
-    kernel_init_scale: float = 0.2
-    dtype: jnp.dtype = jnp.float32  # the dtype of the computation
-    add_pooling_layer: bool = True
-    dtype = jnp.float32
+    config: ElectraConfig
 
     def setup(self):
-        config = ElectraConfig(
-            num_labels=self.num_labels,
-            vocab_size=self.vocab_size,
-            embedding_size=self.embedding_size,
-            hidden_size=self.hidden_size,
-            type_vocab_size=self.type_vocab_size,
-            max_length=self.max_length,
-            num_encoder_layers=self.num_encoder_layers,
-            num_heads=self.num_heads,
-            head_size=self.head_size,
-            intermediate_size=self.intermediate_size,
-            dropout_rate=self.dropout_rate,
-            hidden_act=self.hidden_act,
-            dtype=self.dtype,
+        self.electra_module = FlaxElectraForSequenceClassificationModule(
+            config=self.config
         )
-        self.electra_module = FlaxElectraForSequenceClassificationModule(config=config)
         self.scalarmix = ScalarMix()
 
     def __call__(
@@ -157,3 +132,30 @@ class ElectraModel(nn.Module):
                 old_params["params"][key] = value
 
         return flax.core.freeze(old_params)
+
+    @classmethod
+    def initialize_new_model(
+        cls,
+        key,
+        inputs,
+        num_classes,
+        identifier="google/electra-small-discriminator",
+        **kwargs,
+    ):
+        model = FlaxElectraForSequenceClassification.from_pretrained(
+            identifier,
+            num_labels=num_classes,
+        )
+        classifier = cls(
+            num_labels=num_classes,
+            config=model.config,
+        )
+        params = classifier.init(key, **inputs)
+
+        # replace original parameters with pretrained parameters
+        params = params.unfreeze()
+        assert "electra_module" in params["params"]
+        params["params"]["electra_module"] = model.params
+        params = flax.core.freeze(params)
+
+        return classifier, params

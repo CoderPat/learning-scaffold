@@ -130,7 +130,12 @@ def read_args():
         type=int,
         help="number of training epochs. if none will train until patience is reached",
     )
-    parser.add_argument("--kld-coeff", type=float, default=1.0, help="")
+    parser.add_argument(
+        "--kld-coeff",
+        type=float,
+        default=1.0,
+        help="The coefficient for the explainer regularization",
+    )
     parser.add_argument(
         "--patience", default=5, type=int, help="patience for early stopping"
     )
@@ -231,7 +236,7 @@ def read_args():
 
 
 @partial(jax.jit, static_argnums=(0, 1, 2), donate_argnums=(3, 4))
-def train_step(
+def teacher_train_step(
     model: nn.Module,
     criterion,
     update_fn,
@@ -257,7 +262,7 @@ def train_step(
 
 
 @partial(jax.jit, static_argnums=(0, 1, 2, 3, 4, 5, 6), donate_argnums=(7, 8, 11))
-def train_step_with_teacher(
+def student_train_step(
     task_type: str,
     student: nn.Module,
     student_explainer: nn.Module,
@@ -342,7 +347,7 @@ def train_step_with_teacher(
     static_argnums=(0, 1, 2, 3, 4, 5, 6, 7, 8),
     donate_argnums=(12, 14),
 )
-def metatrain_step(
+def explainer_train_step(
     implicit_differentiation: bool,
     task_type: str,
     student: nn.Module,
@@ -738,7 +743,7 @@ def main():
             shuffle=True,
         ):
             if args.setup == "no_teacher":
-                loss, params, opt_state = train_step(
+                loss, params, opt_state = teacher_train_step(
                     classifier,
                     criterion,
                     optimizer.update,
@@ -755,7 +760,7 @@ def main():
                     losses,
                     (params, explainer_params),
                     opt_state,
-                ) = train_step_with_teacher(
+                ) = student_train_step(
                     task_type,
                     classifier,
                     explainer,
@@ -790,7 +795,7 @@ def main():
                 and (args.num_resets == 0 or resets < args.num_resets)
             ):
                 valid_x, valid_y = next(valid_dataloader)
-                _, teacher_explainer_params, metaopt_state = metatrain_step(
+                _, teacher_explainer_params, metaopt_state = explainer_train_step(
                     args.implicit_differentiation,
                     task_type,
                     classifier,
