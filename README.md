@@ -1,6 +1,6 @@
 # Scaffold-Maximizing Training (SMAT)
 
-This repository is the official implementation for the paper 
+This is the official implementation for the paper 
 *[Learning to Scaffold: Optimizing Model Explanations for Teaching]()*.
 
 <hr />
