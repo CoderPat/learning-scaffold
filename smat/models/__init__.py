@@ -41,7 +41,7 @@ def register_model(model, architectures=None, config_cls=None):
 
     def register_model_cls(cls):
         if model in MODEL_REGISTRY:
-            raise ValueError("Cannot register duplicate model ({})".format(model))
+            print("Overloading previously registered model ({})".format(model))
         if not issubclass(cls, WrappedModel):
             raise ValueError(
                 "Model ({}: {}) must extend WrappedExplainer".format(
@@ -67,6 +67,8 @@ def register_model(model, architectures=None, config_cls=None):
         # HACK: for HF models
         if config_cls is not None:
             CONFIG_REGISTRY[model] = config_cls
+
+        return cls
 
     return register_model_cls
 
@@ -122,7 +124,6 @@ import_models(model_dir, "smat.models")
 
 def save_model(
     model_dir: str,
-    arch: str,
     model: nn.Module,
     params: Dict[str, Any],
     suffix: str = "best",
@@ -145,9 +146,12 @@ def save_model(
             k: v for k, v in model.__dict__.items() if is_jsonable(v)
         }
         # hack for HF models
-        reverse_archmap = {v: k for k, v in ARCH_REGISTRY.items()}
-        if model.__class__ in reverse_archmap:
-            config["model_type"] = reverse_archmap[model.__class__]
+        if hasattr(model, "config"):
+            config["model_baseconfig"] = model.config.to_dict()
+
+        reverse_modelmap = {v: k for k, v in MODEL_REGISTRY.items()}
+        if model.__class__ in reverse_modelmap:
+            config["model_type"] = reverse_modelmap[model.__class__]
         else:
             raise ValueError("unknown model type")
         json.dump(config, f)
@@ -160,8 +164,6 @@ def load_model(
 ):
     """
     Loads a serialized model
-
-    TODO(CoderPat): fix this to accept models other than electra
     """
     with open(os.path.join(model_dir, "config.json")) as f:
         config = json.load(f)

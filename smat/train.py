@@ -287,9 +287,14 @@ def student_train_step(
     if task_type == "classification":
         y_teacher = jnp.argmax(y_teacher, axis=-1)
 
-    teacher_extras = {
-        "grad_fn": teacher.apply(teacher_params, x, method=teacher.embeddings_grad_fn)
-    }
+    teacher_extras = {}
+    if hasattr(teacher, "embeddings_grad_fn"):
+        teacher_extras = {
+            "grad_fn": teacher.apply(
+                teacher_params, x, method=teacher.embeddings_grad_fn
+            )
+        }
+
     teacher_expl, _ = teacher_explainer.apply(
         teacher_explainer_params, x, teacher_attn, **teacher_extras
     )
@@ -307,11 +312,13 @@ def student_train_step(
         main_loss = criterion(outputs, y_teacher)
 
         # compute explanations based on attention for both teacher and student
-        student_extras = {
-            "grad_fn": student.apply(
-                student_params, x, method=student.embeddings_grad_fn
-            )
-        }
+        student_extras = {}
+        if hasattr(student, "embeddings_grad_fn"):
+            student_extras = {
+                "grad_fn": student.apply(
+                    student_params, x, method=student.embeddings_grad_fn
+                )
+            }
         student_expl, expl_extras = student_explainer.apply(
             student_explainer_params, x, student_state, **student_extras
         )
@@ -384,13 +391,13 @@ def explainer_train_step(
     if task_type == "classification":
         y_teacher = jnp.argmax(y_teacher, axis=-1)
 
-    teacher_extras = {
-        "grad_fn": teacher.apply(
-            teacher_params,
-            train_x,
-            method=teacher.embeddings_grad_fn,
-        )
-    }
+    teacher_extras = {}
+    if hasattr(teacher, "embeddings_grad_fn"):
+        teacher_extras = {
+            "grad_fn": teacher.apply(
+                teacher_params, train_x, method=teacher.embeddings_grad_fn
+            )
+        }
 
     def train_loss_fn(params, metaparams):
         student_params, student_explainer_params = params
@@ -406,13 +413,13 @@ def explainer_train_step(
         main_loss = criterion(outputs, y_teacher)
 
         # compute explanations
-        student_extras = {
-            "grad_fn": student.apply(
-                student_params,
-                train_x,
-                method=student.embeddings_grad_fn,
-            )
-        }
+        student_extras = {}
+        if hasattr(student, "embeddings_grad_fn"):
+            student_extras = {
+                "grad_fn": student.apply(
+                    student_params, train_x, method=student.embeddings_grad_fn
+                )
+            }
         student_expl, expl_extras = student_explainer.apply(
             student_explainer_params,
             train_x,
@@ -565,6 +572,7 @@ def main():
     if args.num_examples is not None:
         train_data = train_data[: args.num_examples]
 
+    # Tokenizers for now are handled manually
     if args.tokenizer == "electra":
         tokenizer = ElectraTokenizerFast.from_pretrained(
             "google/electra-small-discriminator"
@@ -653,7 +661,6 @@ def main():
     )
 
     # load optimizer
-    # TODO: allow different optimizer
     optimizer = optimizer_with_clip(
         args.optimizer,
         args.learning_rate,
@@ -791,7 +798,6 @@ def main():
             if (
                 args.setup == "learnable_teacher"
                 and step % args.meta_interval == 0
-                and epoch >= args.meta_warmup
                 and (args.num_resets == 0 or resets < args.num_resets)
             ):
                 valid_x, valid_y = next(valid_dataloader)
