@@ -23,9 +23,37 @@ Other requirements can be install by running
 pip install -r requirements
 ```
 
-## **NEW**: Quickly train explainers for you model
+## Quickly train explainers for you model
 
-## Running
+The smat package contains a wrapper function that allows you to quickly train explainers for your model. All you need to do is wrap your model into a special class, and define some parameters for smat.
+
+```python
+from smat import *
+
+# wrap model with
+@smat.models.register_model('my_model')
+class MyModel(smat.models.WrappedModel):
+      ...
+
+# get data and model
+train_data, valid_data = get_data()
+model, params = get_trained_model()
+
+explainer, expl_params = smat.compact.train_explainer(
+    task_type="classification",
+    teacher_model=model,
+    teacher_params=params,
+    dataloader=partial(dataloader, tokenizer=tokenizer),
+    train_dataset=train_data,
+    valid_dataset=valid_data,
+    num_examples=0.1,
+    student_model="my_model",
+)
+```
+
+See the [example](/example.py) for a more concrete case on applying SMAT to explain BERT predictions on STT-2 (not in the paper!)
+
+## Train models and explainers
 
 To train a teacher model run
 
@@ -38,7 +66,7 @@ python smat/train.py \
 
 ```
 
-To train a student model learning from this teacher model  with `num_samples` training examples, run
+To train a student model learning from this teacher model with `num_samples` training examples, run
 
 ```bash
 python smat/train.py \
@@ -49,13 +77,14 @@ python smat/train.py \
       --teacher-dir $teacher_dir 
 ```
 
-To train a student model learning from the trained teacher with `num_samples` training examples, run
+Finally to train a student model AND an explainer for the teacher run
 
 ```bash
 python smat/train.py \
-      --setup static_teacher \
+      --setup learnable_teacher \
       --num-examples $num_examples \
       --teacher-dir $teacher_dir 
+      --teacher-explainer-dir $teacher_explainer_dir
 ```
 
 ## Workflows
