@@ -37,14 +37,14 @@ class MyModel(smat.models.WrappedModel):
       ...
 
 # get data and model
-train_data, valid_data = get_data()
+train_data, valid_data, dataloader = get_data()
 model, params = get_trained_model()
 
 explainer, expl_params = smat.compact.train_explainer(
     task_type="classification",
     teacher_model=model,
     teacher_params=params,
-    dataloader=partial(dataloader, tokenizer=tokenizer),
+    dataloader=dataloader,
     train_dataset=train_data,
     valid_dataset=valid_data,
     num_examples=0.1,
