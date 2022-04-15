@@ -224,4 +224,4 @@ def predict_and_explain(sample):
 
 text="This is a test"
 batch = dict(tokenizer([text],return_tensors="jax"))
-print(predict_and_explain)
+print(predict_and_explain(batch))
