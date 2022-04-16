@@ -109,5 +109,5 @@ ducttape tapes/main.tape -C tapes/main.tconf summary
 ## Annotation Tool for Visual Explanations
 
 We also make the source code for the annotation tool available.
-See the `/annotation-tool` sub-repo for more details.
+See the [annotation-tool](https://github.com/CoderPat/annotation-tool) sub-repo for more details.
 
