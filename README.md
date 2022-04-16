@@ -1,6 +1,6 @@
 # Scaffold-Maximizing Training (SMAT)
 
-This repository is the official implementation for the paper 
+This is the official implementation for the paper 
 *[Learning to Scaffold: Optimizing Model Explanations for Teaching]()*.
 
 <hr />
@@ -12,8 +12,9 @@ This repository is the official implementation for the paper
 
 The code is based on the [JAX](https://github.com/google/jax).
 Please refer to the project page to see how to install the correct version for your system.
+In particular, we used `jax==0.2.24` and `jaxlib==0.1.72`
 
-It also depends on two custom forks:
+It also depends on two custom forks. The forks are required because neither Flax nor Transformers allow extracting *unnormalized* attention:
 
 * A [fork of Flax](https://github.com/CoderPat/flax/tree/custom-attention)
 * A [fork of Transformers](https://github.com/CoderPat/transformers/tree/unnormalized-attention)
@@ -37,14 +38,14 @@ class MyModel(smat.models.WrappedModel):
       ...
 
 # get data and model
-train_data, valid_data = get_data()
+train_data, valid_data, dataloader = get_data()
 model, params = get_trained_model()
 
 explainer, expl_params = smat.compact.train_explainer(
     task_type="classification",
     teacher_model=model,
     teacher_params=params,
-    dataloader=partial(dataloader, tokenizer=tokenizer),
+    dataloader=dataloader,
     train_dataset=train_data,
     valid_dataset=valid_data,
     num_examples=0.1,
