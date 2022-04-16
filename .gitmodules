@@ -1,3 +1,6 @@
 [submodule "mlqe-pe"]
 	path = mlqe-pe
 	url = https://github.com/sheffieldnlp/mlqe-pe
+[submodule "annotation-tool"]
+	path = annotation-tool
+	url = git@github.com:CoderPat/annotation-tool.git
