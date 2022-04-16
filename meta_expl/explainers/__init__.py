@@ -155,6 +155,8 @@ class SaliencyExplainer(Explainer, metaclass=ABCMeta):
             return entmax15
         elif self.normalizer_fn == "topk_softmax":
             return partial(topk_softmax, topk=0.25)
+        elif self.normalizer_fn == "id":
+            return lambda x: x
         else:
             return self.normalizer_fn
 
