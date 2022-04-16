@@ -51,7 +51,6 @@ def save_data_to_file(fname, data):
 
 
 if __name__ == '__main__':
-    # python3 preprocess_mlqepe.py --input-dir ../mlqe-pe/data/ --output-dir data/mlqepe/
     parser = argparse.ArgumentParser()
     parser.add_argument('--input-dir', help='Base dir for mlqe-pe dataset.', default='mlqe-pe/data/')
     parser.add_argument('--output-dir', help='Base dir to store LPs data.', default='data/mlqepe/')
