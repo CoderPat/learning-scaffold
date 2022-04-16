@@ -12,8 +12,9 @@ This is the official implementation for the paper
 
 The code is based on the [JAX](https://github.com/google/jax).
 Please refer to the project page to see how to install the correct version for your system.
+In particular, we used `jax==0.2.24` and `jaxlib==0.1.72`
 
-It also depends on two custom forks:
+It also depends on two custom forks. The forks are required because neither Flax nor Transformers allow extracting *unnormalized* attention:
 
 * A [fork of Flax](https://github.com/CoderPat/flax/tree/custom-attention)
 * A [fork of Transformers](https://github.com/CoderPat/transformers/tree/unnormalized-attention)
