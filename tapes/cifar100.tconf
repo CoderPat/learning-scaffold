@@ -1,5 +1,5 @@
 global {
-    ducttape_output="/projects/tir2/users/pfernand/metaexpl-experiments/cifar100-vit-vit"
+    ducttape_output="/projects/tir4/users/pfernand/sandbox/public-release-cifar100-test"
     ducttape_experimental_submitters=true
     ducttape_experimental_imports=true
     ducttape_experimental_multiproc=true
@@ -28,10 +28,7 @@ global {
     teacher_init_fn=uniform
     teacher_aggregator_idx="\"mean\""
     student_aggregator_idx="\"mean\""
-    teacher_aggregator_dim="\"row\""
-    student_aggregator_dim="\"row\""
-    parametrize_head_coeffs=true
-    normalize_head_coeffs=(NormalizeHeadCoeffs: sparsemax="\"sparsemax\"" entmax="\"entmax\"" softmax=true none=false)
+    normalize_head_coeffs="\"sparsemax\""
     teacher_layer_idx=(
         BestLayer:
             false=null
@@ -62,7 +59,7 @@ global {
 
     seed=(Seed: 0 9 11 30 69)
 
-    wandb_project="meta-expl-cifar100-vit-vit"
+    wandb_project="learning-scaffold-imdb-test"
 
     exclude="tir-0-[7,9,11,13,15,17,19,32,36],tir-0-3,tir-1-11,tir-1-13,tir-1-18"
     submitter=slurm
@@ -72,18 +69,13 @@ plan TrainTeacher {
     reach TrainTeacher
 }
 
-plan TrainStudent { 
-    reach AverageResults via (KLDCoeff: 0)
-    reach AverageResults via (KLDCoeff: 5) * (NormalizeHeadCoeffs: sparsemax softmax entmax)
+plan PublicReleaseTest {
+    reach TrainStudent via (KLDCoeff: 0)
+    reach TrainStudent via (KLDCoeff: 5)
+    #reach TrainStudent via (NumExamples: 1000) * (KLDCoeff: 0.2) * (TeacherExplainer: integrated_gradients)
+    reach TrainStudent via (KLDCoeff: 5) * (MetaLearn: true) * (MetaLR: 5e-4)
 }
 
-plan MetaTrain {
-    reach AverageResults via (KLDCoeff: 5) * (MetaLearn: true) * (MetaLR: 2e-4 5e-4) * (NormalizeHeadCoeffs: sparsemax softmax entmax)
-}
-
-plan GradientExplainers {
-    reach AverageResults via (KLDCoeff: 0.2 1 5) * (TeacherExplainer: gradient_input integrated_gradients) 
-}
 
 plan PaperResults {
     reach AverageResults via (NumExamples: *) * (KLDCoeff: 0 5)

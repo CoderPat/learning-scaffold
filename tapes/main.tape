@@ -114,8 +114,6 @@ task TrainStudent
       --kld-coeff $kld_coeff \
       --meta-interval $meta_interval \
       --meta-lr $meta_lr \
-      --meta-warmup $meta_warmup \
-      --num-resets $num_resets \
       $([ "$implicit_differentiation" = true ] && echo "--implicit-differentiation" || echo "") \
       --batch-size $batch_size \
       --model-dir $student_dir \

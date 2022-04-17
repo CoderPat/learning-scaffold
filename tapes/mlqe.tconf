@@ -1,8 +1,7 @@
 global {
-    ducttape_output="/projects/tir2/users/pfernand/metaexpl-experiments/mlqe-xlmr-xlmr-scalarmix"
+    ducttape_output="/projects/tir4/users/pfernand/sandbox/public-release-mlqe-test"
     ducttape_experimental_submitters=true
     ducttape_experimental_imports=true
-    ducttape_experimental_multiproc=true
     repo="/home/pfernand/repos/meta-expl"
 
     task="mlqe"
@@ -28,7 +27,7 @@ global {
     teacher_init_fn=uniform
     teacher_aggregator_idx="\"mean\""
     student_aggregator_idx="\"mean\""
-    normalize_head_coeffs=(NormalizeHeadCoeffs: sparsemax="\"sparsemax\"" entmax="\"entmax\"" softmax=true softmax_hot="\"softmax_hot\"" none=false)
+    normalize_head_coeffs=(NormalizeHeadCoeffs: sparsemax="\"sparsemax\"" entmax="\"entmax\"" softmax="\"softmax\""  none=false)
     teacher_layer_idx=(
         BestLayer:
             false=null
@@ -71,29 +70,19 @@ plan TrainTeacher {
     reach TrainTeacher
 }
 
-plan TrainStudent { 
-    reach AverageResults via (KLDCoeff: 0)
-    reach AverageResults via (KLDCoeff: 5) * (TeacherExplainer: attention) * (NormalizeHeadCoeffs: sparsemax softmax entmax) * (TeacherNormalizerFn: *)
-    reach AverageResults via (KLDCoeff: 5) * (TeacherExplainer: attention) * (NormalizeHeadCoeffs: softmax_hot)
-}
-
-plan MetaTrain {
-    reach AverageResults via (KLDCoeff: 5) * (MetaLearn: true) * (TeacherExplainer: attention) * (MetaLR: 2e-4) * (NormalizeHeadCoeffs: sparsemax softmax entmax) * (TeacherNormalizerFn: *)
-    reach AverageResults via (KLDCoeff: 5) * (MetaLearn: true) * (TeacherExplainer: attention) * (MetaLR: 5e-4 1e-3) * (NormalizeHeadCoeffs: sparsemax)
-    reach AverageResults via (KLDCoeff: 5) * (MetaLearn: true) * (TeacherExplainer: attention) * (MetaLR: 5e-4 1e-3) * (NormalizeHeadCoeffs: softmax entmax)
-    reach AverageResults via (KLDCoeff: 5) * (MetaLearn: true) * (TeacherExplainer: attention) * (MetaLR: 5e-4) * (NormalizeHeadCoeffs: softmax_hot)
-}
-
-plan GradientExplainers {
-    reach AverageResults via (NumExamples: 4100) * (KLDCoeff: 0.2 1 5) * (TeacherExplainer: gradient_input integrated_gradients) 
+plan PublicReleaseTest {
+    reach TrainStudent via (KLDCoeff: 0)
+    reach TrainStudent via (KLDCoeff: 5)
+    reach TrainStudent via (KLDCoeff: 0.2) * (TeacherExplainer: integrated_gradients)
+    reach TrainStudent via (KLDCoeff: 5) * (MetaLearn: true) * (MetaLR: 5e-4)
 }
 
 plan PaperSimulabilityResults {
-    reach AverageResults via (NumExamples: 4100 2100 8400) * (KLDCoeff: 0)
-    reach AverageResults via (NumExamples: 4100 2100 8400) * (KLDCoeff: 5)
-    reach AverageResults via (NumExamples: 4100 2100 8400) * (KLDCoeff: 5) * (BestLayer: true)
-    reach AverageResults via (NumExamples: 4100 2100 8400) * (KLDCoeff: 0.2) * (TeacherExplainer: gradient_input integrated_gradients)
-    reach AverageResults via (NumExamples: 4100 2100 8400) * (KLDCoeff: 5) * (MetaLearn: true) * (MetaLR: 2e-4)
+    reach AverageResults via (NumExamples: *) * (KLDCoeff: 0)
+    reach AverageResults via (NumExamples: *) * (KLDCoeff: 5)
+    reach AverageResults via (NumExamples: *) * (KLDCoeff: 5) * (BestLayer: true)
+    reach AverageResults via (NumExamples: *) * (KLDCoeff: 0.2) * (TeacherExplainer: gradient_input integrated_gradients)
+    reach AverageResults via (NumExamples: *) * (KLDCoeff: 5) * (MetaLearn: true) * (MetaLR: 2e-4)
 }
 
 plan PaperHeadsNormalizerResults {
