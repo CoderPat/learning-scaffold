@@ -5,6 +5,6 @@ optax
 pkbar
 wandb
 # Flax and Transfomers Fork
-git+ssh://git@github.com/CoderPat/transformers.git@unnormalized-attention#egg=transformers
-git+ssh://git@github.com/CoderPat/flax.git@custom-attention#egg=flax
-git+ssh://git@github.com/deep-spin/entmax-jax.git@add-losses#egg=entmax-jax
+git+https://git@github.com/CoderPat/transformers.git@unnormalized-attention#egg=transformers
+git+https://git@github.com/CoderPat/flax.git@custom-attention#egg=flax
+git+https://git@github.com/deep-spin/entmax-jax.git@add-losses#egg=entmax-jax
