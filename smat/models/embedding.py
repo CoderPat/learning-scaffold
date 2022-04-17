@@ -3,9 +3,16 @@ import jax
 import jax.numpy as jnp
 import flax
 
+from . import register_model, WrappedModel
 
-class EmbedAttentionModel(nn.Module):
-    """A simple embeddings+attention classification module"""
+
+@register_model("embedding")
+class EmbedAttentionModel(WrappedModel):
+    """
+    A simple embeddings+attention classification module
+
+    NOTE: not use in the paper
+    """
 
     num_classes: int
     vocab_size: int
@@ -65,3 +72,32 @@ class EmbedAttentionModel(nn.Module):
         params["params"]["Embed_0"]["embedding"] = new_embeddings[0]
         params["params"]["Embed_1"]["embedding"] = new_embeddings[1]
         return flax.core.freeze(params)
+
+    @classmethod
+    def initialize_new_model(
+        cls,
+        key,
+        inputs,
+        num_classes,
+        vocab_size,
+        embeddings_dim=768,
+        max_len=256,
+        embeddings=None,
+    ):
+        classifier = EmbedAttentionModel(
+            num_classes=num_classes,
+            vocab_size=vocab_size,
+            embedding_size=embeddings[0].shape[1]
+            if embeddings is not None
+            else embeddings_dim,
+            max_position_embeddings=embeddings[0].shape[1]
+            if embeddings is not None
+            else max_len,
+        )
+
+        # instantiate model parameters
+        params = classifier.init(key, **inputs)
+        if embeddings is not None:
+            classifier.replace_embeddings(params, embeddings)
+
+        return classifier, params

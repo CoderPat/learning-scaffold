@@ -1,17 +1,22 @@
 import jax
 
 import flax
-import flax.linen as nn
 import jax.numpy as jnp
-from transformers import ViTConfig
+from transformers import ViTConfig, FlaxViTForImageClassification
 from transformers.models.vit.modeling_flax_vit import (
     FlaxViTForImageClassificationModule,
 )
 
+from . import register_model, WrappedModel
 from .scalar_mix import ScalarMix
 
 
-class ViTModel(nn.Module):
+@register_model(
+    "vit",
+    architectures={"vit-base": {"identifier": "google/vit-base-patch16-224-in21k"}},
+    config_cls=ViTConfig,
+)
+class ViTModel(WrappedModel):
     """A ViT-based classification module"""
 
     num_labels: int
@@ -100,3 +105,31 @@ class ViTModel(nn.Module):
                 old_params["params"][key] = value
 
         return flax.core.freeze(old_params)
+
+    @classmethod
+    def initialize_new_model(
+        cls,
+        key,
+        inputs,
+        num_classes,
+        identifier="google/vit-base-patch16-224-in21k",
+        **kwargs,
+    ):
+        model = FlaxViTForImageClassification.from_pretrained(
+            identifier,
+            num_labels=num_classes,
+        )
+
+        classifier = ViTModel(
+            num_labels=num_classes,
+            config=model.config,
+        )
+        params = classifier.init(key, **inputs)
+
+        # replace original parameters with pretrained parameters
+        params = params.unfreeze()
+        assert "vit_module" in params["params"]
+        params["params"]["vit_module"] = model.params
+        params = flax.core.freeze(params)
+
+        return classifier, params

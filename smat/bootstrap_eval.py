@@ -5,7 +5,7 @@ import jax
 import jax.numpy as jnp
 import numpy as onp
 
-from meta_expl.utils import (
+from smat.utils import (
     accuracy,
     neg_rmse,
     pearson,

@@ -1,0 +1,86 @@
+global {
+    ducttape_output="/projects/tir4/users/pfernand/sandbox/public-release-cifar100-test"
+    ducttape_experimental_submitters=true
+    ducttape_experimental_imports=true
+    ducttape_experimental_multiproc=true
+    repo="/home/pfernand/repos/meta-expl"
+
+    task="cifar100"
+    task_params=""
+    num_examples=(NumExamples: 4500 2250 9000)
+    metric="accuracy"
+
+    # models and explainers parameters
+    teacher_arch=vit-base
+    student_arch=vit-base
+    init_embed=false
+
+    teacher_explainer=(
+        TeacherExplainer:
+            attention="attention_explainer"
+            gradient_input="gradient_input_explainer"
+            integrated_gradients="integrated_gradients_explainer"
+    )
+    student_explainer=attention_explainer
+
+    teacher_normalizer_fn=softmax
+    student_normalizer_fn=softmax
+    teacher_init_fn=uniform
+    teacher_aggregator_idx="\"mean\""
+    student_aggregator_idx="\"mean\""
+    normalize_head_coeffs="\"sparsemax\""
+    teacher_layer_idx=(
+        BestLayer:
+            false=null
+            true=11
+    )
+    student_layer_idx=(
+        BestLayer: false=null true=11
+    )
+    aggregator_normalizer_fn=sparsemax
+
+    # optimization paramaters
+    student_optimizer=sgd
+    num_epochs=""
+    batch_size=16
+    lr=5e-3
+    kld_coeff=(KLDCoeff: 0 0.2 1 5)
+    patience=5
+
+    # (meta) optimization parameters
+    metalearn=(
+        MetaLearn:
+            false=false
+            true=true
+    )
+    meta_lr=(MetaLR: 1e-3 2e-3 1e-4 2e-4 5e-4 1e-5)
+    meta_interval=1
+    implicit_differentiation=false
+
+    seed=(Seed: 0 9 11 30 69)
+
+    wandb_project="learning-scaffold-imdb-test"
+
+    exclude="tir-0-[7,9,11,13,15,17,19,32,36],tir-0-3,tir-1-11,tir-1-13,tir-1-18"
+    submitter=slurm
+}
+
+plan TrainTeacher {
+    reach TrainTeacher
+}
+
+plan PublicReleaseTest {
+    reach TrainStudent via (KLDCoeff: 0)
+    reach TrainStudent via (KLDCoeff: 5)
+    #reach TrainStudent via (NumExamples: 1000) * (KLDCoeff: 0.2) * (TeacherExplainer: integrated_gradients)
+    reach TrainStudent via (KLDCoeff: 5) * (MetaLearn: true) * (MetaLR: 5e-4)
+}
+
+
+plan PaperResults {
+    reach AverageResults via (NumExamples: *) * (KLDCoeff: 0 5)
+    reach AverageResults via (NumExamples: *) * (KLDCoeff: 5) * (BestLayer: true)
+    reach AverageResults via (NumExamples: *) * (KLDCoeff: 0.2) * (TeacherExplainer: integrated_gradients gradient_input)
+    reach AverageResults via (NumExamples: *) * (KLDCoeff: 5) * (MetaLearn: true) * (MetaLR: 5e-4)
+}
+

@@ -25,11 +25,13 @@ def load_data(
         was chosen (already shuffled).
     """
 
-    hf_dataset = load_dataset("glue", "sst2")
-    data = hf_dataset["validation" if split == "valid" else split]
-    data = list(data)
-    rng = random.RandomState(seed)
-    rng.shuffle(data)
+    assert split == "test", "movie_rationales only has test split"
+    hf_dataset = load_dataset("movie_rationales")
+
+    data = []
+    for split in ("train", "validation", "test"):
+        data.extend(list(hf_dataset[split]))
+
     return data
 
 
@@ -65,7 +67,7 @@ def dataloader(
                 break
             sample = dataset[idxs[i + j]]
             batch_idxs.append(idxs[i + j])
-            batch_inputs.append(sample["sentence"])
+            batch_inputs.append(sample["review"])
             batch_outputs.append(jnp.array(sample["label"]))
 
         batch_inputs = dict(

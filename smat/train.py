@@ -4,7 +4,6 @@ from itertools import cycle
 from typing import Dict
 import json
 
-import flax
 import flax.linen as nn
 import jax
 import jax.numpy as jnp
@@ -19,10 +18,10 @@ from transformers import (
     ViTFeatureExtractor,
 )
 
-from meta_expl.explainers import EXPLAINER_REGISTRY, create_explainer, save_explainer
-from meta_expl.hypergrad import hypergrad
-from meta_expl.models import create_model, load_model, save_model
-from meta_expl.utils import (
+from smat.explainers import EXPLAINER_REGISTRY, create_explainer, save_explainer
+from smat.hypergrad import hypergrad
+from smat.models import create_model, load_model, save_model
+from smat.utils import (
     PRNGSequence,
     optimizer_with_clip,
     cross_entropy_loss,
@@ -45,29 +44,48 @@ def read_args():
         "--setup",
         choices=["no_teacher", "static_teacher", "learnable_teacher"],
         default="no_teacher",
-        help="TODO: proper documentation",
+        help="The setting for the training the model. `no_teacher` means that we are training a teacher for real performance "
+        "`static_teacher` that we training a student for simulability, without any learning for the teacher explainer "
+        "and `learnable_teacher` is the same, but the teacher explainer is trained aswell according to SMAT.",
     )
-    parser.add_argument("--task", default="imdb", choices=["imdb", "mlqe", "cifar100"])
-    parser.add_argument("--task-params", default="{}", type=json.loads)
+    parser.add_argument(
+        "--task",
+        default="imdb",
+        choices=["imdb", "mlqe", "cifar100"],
+        help="Task/dataset to train the model on.",
+    )
+    parser.add_argument(
+        "--task-params",
+        default="{}",
+        type=json.loads,
+        help="Extra params the task takes. Pass as json.",
+    )
 
     # Parameters defining "main model"
     parser.add_argument(
         "--arch",
         default="electra",
-        choices=["electra", "xlm-r", "xlm-r-large", "mbert", "embedding", "vit-base"],
+        choices=["electra", "xlm-r", "xlm-r-large", "vit-base", "embedding"],
+        help="Model architecture to use for the model being trained.",
     )
     parser.add_argument(
         "--explainer",
         choices=EXPLAINER_REGISTRY.keys(),
         default="attention_explainer",
+        help="Student explainer to use. It will not be used when `setup` is `no_teacher`.",
     )
     parser.add_argument(
         "--explainer-params",
         default="{}",
         type=json.loads,
+        help="Extra params for the explainer. Pass as json.",
     )
 
-    parser.add_argument("--initialize-embeddings", action="store_true")
+    parser.add_argument(
+        "--initialize-embeddings",
+        action="store_true",
+        help="Initialize embeddings with the teacher embeddings. Only used when `arch` is `embedding`.",
+    )
 
     # Parameters defining teacher
     parser.add_argument(
@@ -81,11 +99,13 @@ def read_args():
         "--teacher-explainer",
         choices=EXPLAINER_REGISTRY.keys(),
         default="attention_explainer",
+        help="Teacher explainer to use. It will not be used when `setup` is `no_teacher`.",
     )
     parser.add_argument(
         "--teacher-explainer-params",
         default="{}",
         type=lambda s: json.loads(s),
+        help="Extra params for the teacher explainer. Pass as json.",
     )
 
     # Parameters defining data used
@@ -93,7 +113,7 @@ def read_args():
     parser.add_argument(
         "--tokenizer",
         default="electra",
-        help="tokenizer to use. Currently the same tokenizer needs to be used for student and teacher model",
+        help="Tokenizer to use. Currently the same tokenizer needs to be used for student and teacher model",
     )
     parser.add_argument(
         "--max-len",
@@ -110,7 +130,12 @@ def read_args():
         type=int,
         help="number of training epochs. if none will train until patience is reached",
     )
-    parser.add_argument("--kld-coeff", type=float, default=1.0, help="")
+    parser.add_argument(
+        "--kld-coeff",
+        type=float,
+        default=1.0,
+        help="The coefficient for the explainer regularization",
+    )
     parser.add_argument(
         "--patience", default=5, type=int, help="patience for early stopping"
     )
@@ -151,22 +176,19 @@ def read_args():
         type=int,
         help="Number of inner optimization steps to perform before applying a optimization to the teacher",
     )
-    parser.add_argument(
-        "--meta-warmup",
-        default=0,
-        type=int,
-    )
     parser.add_argument("--metaoptimizer", default="adamw", choices=["adamw", "sgd"])
     parser.add_argument("--meta-lr", default=1e-3, type=float)
     parser.add_argument(
-        "--meta-explicit",
+        "--implicit-differentiation",
         action="store_true",
-        help="Weather to use explicit gradient computation in the meta optimization",
+        help="Weather to use implicit differentiation to compute gradients in the teacher explainer optimization"
+        "WARNING: Not used in the paper",
     )
     parser.add_argument(
         "--num-resets",
         default=0,
         type=int,
+        help="Number of times to reset the student. WARNING: Not used in the paper",
     )
 
     # Parameters for serialization
@@ -180,7 +202,7 @@ def read_args():
         "--explainer-dir",
         type=str,
         default=None,
-        help="Directory to save the model",
+        help="Directory to save the explainer",
     )
     parser.add_argument(
         "--teacher-explainer-dir",
@@ -204,6 +226,7 @@ def read_args():
         "--log-teacher-params",
         default=None,
         type=str,
+        help="File to log the teacher parameters to",
     )
     parser.add_argument("--save-test-outputs", default=None, type=str)
 
@@ -217,7 +240,7 @@ def read_args():
 
 
 @partial(jax.jit, static_argnums=(0, 1, 2), donate_argnums=(3, 4))
-def train_step(
+def teacher_train_step(
     model: nn.Module,
     criterion,
     update_fn,
@@ -243,7 +266,7 @@ def train_step(
 
 
 @partial(jax.jit, static_argnums=(0, 1, 2, 3, 4, 5, 6), donate_argnums=(7, 8, 11))
-def train_step_with_teacher(
+def student_train_step(
     task_type: str,
     student: nn.Module,
     student_explainer: nn.Module,
@@ -261,15 +284,21 @@ def train_step_with_teacher(
     y: jnp.array,
     expl_coeff: float,
 ):
-    """Train step for a model trained with attention supervision by a teacher"""
+    """Train step for a model trained with explainer supervision by a teacher"""
+
     # compute teacher prediction and attention
     y_teacher, teacher_attn = teacher.apply(teacher_params, **x, deterministic=True)
     if task_type == "classification":
         y_teacher = jnp.argmax(y_teacher, axis=-1)
 
-    teacher_extras = {
-        "grad_fn": teacher.apply(teacher_params, x, method=teacher.embeddings_grad_fn)
-    }
+    teacher_extras = {}
+    if hasattr(teacher, "embeddings_grad_fn"):
+        teacher_extras = {
+            "grad_fn": teacher.apply(
+                teacher_params, x, method=teacher.embeddings_grad_fn
+            )
+        }
+
     teacher_expl, _ = teacher_explainer.apply(
         teacher_explainer_params, x, teacher_attn, **teacher_extras
     )
@@ -287,11 +316,13 @@ def train_step_with_teacher(
         main_loss = criterion(outputs, y_teacher)
 
         # compute explanations based on attention for both teacher and student
-        student_extras = {
-            "grad_fn": student.apply(
-                student_params, x, method=student.embeddings_grad_fn
-            )
-        }
+        student_extras = {}
+        if hasattr(student, "embeddings_grad_fn"):
+            student_extras = {
+                "grad_fn": student.apply(
+                    student_params, x, method=student.embeddings_grad_fn
+                )
+            }
         student_expl, expl_extras = student_explainer.apply(
             student_explainer_params, x, student_state, **student_extras
         )
@@ -325,10 +356,10 @@ def train_step_with_teacher(
 @partial(
     jax.jit,
     static_argnums=(0, 1, 2, 3, 4, 5, 6, 7, 8),
-    donate_argnums=(9, 10, 11, 12, 13, 14),
+    donate_argnums=(12, 14),
 )
-def metatrain_step(
-    explicit_optimization: bool,
+def explainer_train_step(
+    implicit_differentiation: bool,
     task_type: str,
     student: nn.Module,
     student_explainer: nn.Module,
@@ -353,9 +384,8 @@ def metatrain_step(
 ):
     """
     Performs an update on the teacher explainer
-
-    TODO: document parameters better
     """
+
     # compute teacher prediction and attention
     y_teacher, teacher_state = teacher.apply(
         teacher_params,
@@ -365,13 +395,13 @@ def metatrain_step(
     if task_type == "classification":
         y_teacher = jnp.argmax(y_teacher, axis=-1)
 
-    teacher_extras = {
-        "grad_fn": teacher.apply(
-            teacher_params,
-            train_x,
-            method=teacher.embeddings_grad_fn,
-        )
-    }
+    teacher_extras = {}
+    if hasattr(teacher, "embeddings_grad_fn"):
+        teacher_extras = {
+            "grad_fn": teacher.apply(
+                teacher_params, train_x, method=teacher.embeddings_grad_fn
+            )
+        }
 
     def train_loss_fn(params, metaparams):
         student_params, student_explainer_params = params
@@ -387,13 +417,13 @@ def metatrain_step(
         main_loss = criterion(outputs, y_teacher)
 
         # compute explanations
-        student_extras = {
-            "grad_fn": student.apply(
-                student_params,
-                train_x,
-                method=student.embeddings_grad_fn,
-            )
-        }
+        student_extras = {}
+        if hasattr(student, "embeddings_grad_fn"):
+            student_extras = {
+                "grad_fn": student.apply(
+                    student_params, train_x, method=student.embeddings_grad_fn
+                )
+            }
         student_expl, expl_extras = student_explainer.apply(
             student_explainer_params,
             train_x,
@@ -434,7 +464,7 @@ def metatrain_step(
         )
         return criterion(outputs, v_y_teacher)
 
-    if explicit_optimization:
+    if not implicit_differentiation:
 
         def student_inneropt_loss(params, metaparams):
             grads = jax.grad(train_loss_fn)(params, metaparams)
@@ -482,7 +512,7 @@ def main(args):
 
     # load task specific data loaders and set variables
     if args.task == "imdb":
-        from meta_expl.data.imdb import dataloader, load_data
+        from smat.data.imdb import dataloader, load_data
 
         train_data = load_data(args.setup, "train", **args.task_params)
         valid_data = load_data(args.setup, "valid", **args.task_params)
@@ -495,7 +525,7 @@ def main(args):
         criterion = cross_entropy_loss
         metrics = [accuracy]
     elif args.task == "sst2":
-        from meta_expl.data.sst2 import dataloader, load_data
+        from smat.data.sst2 import dataloader, load_data
 
         train_data = load_data(args.setup, "train", **args.task_params)
         valid_data = load_data(args.setup, "valid", **args.task_params)
@@ -508,7 +538,7 @@ def main(args):
         criterion = cross_entropy_loss
         metrics = [accuracy]
     elif args.task == "mlqe":
-        from meta_expl.data.mlqe import dataloader, load_data
+        from smat.data.mlqe import dataloader, load_data
 
         sep_token = (
             "</s>" if args.arch == "xlm-r" or args.arch == "xlm-r-large" else "[SEP]"
@@ -526,7 +556,7 @@ def main(args):
         criterion = mse_loss
         metrics = [pearson, neg_rmse]
     elif args.task == "cifar100":
-        from meta_expl.data.cifar100 import dataloader, load_data
+        from smat.data.cifar100 import dataloader, load_data
 
         train_data = load_data(args.setup, "train")
         valid_data = load_data(args.setup, "valid")
@@ -544,6 +574,7 @@ def main(args):
     if args.num_examples is not None:
         train_data = train_data[: args.num_examples]
 
+    # Tokenizers for now are handled manually
     if args.tokenizer == "electra":
         tokenizer = ElectraTokenizerFast.from_pretrained(
             "google/electra-small-discriminator"
@@ -589,8 +620,6 @@ def main(args):
         teacher, teacher_params, dummy_state = load_model(
             model_dir=args.teacher_dir,
             inputs=dummy_inputs,
-            batch_size=args.batch_size,
-            max_len=args.max_len,
         )
         teacher_explainer, teacher_explainer_params = create_explainer(
             key=next(keyseq),
@@ -617,7 +646,6 @@ def main(args):
         num_classes=num_classes,
         vocab_size=vocab_size,
         arch=args.arch,
-        batch_size=args.batch_size,
         max_len=args.max_len,
         embeddings=embeddings,
     )
@@ -635,7 +663,6 @@ def main(args):
     )
 
     # load optimizer
-    # TODO: allow different optimizer
     optimizer = optimizer_with_clip(
         args.optimizer,
         args.learning_rate,
@@ -652,9 +679,6 @@ def main(args):
             args.metaoptimizer, args.meta_lr, warmup_steps=0, max_norm=args.clip_grads
         )
         metaopt_state = metaoptimizer.init(teacher_explainer_params)
-
-    if args.log_teacher_params is not None:
-        log_teacher_params_f = open(args.log_teacher_params, "w")
 
     # define evaluation loop
     def evaluate(data, params, simulability=False):
@@ -728,7 +752,7 @@ def main(args):
             shuffle=True,
         ):
             if args.setup == "no_teacher":
-                loss, params, opt_state = train_step(
+                loss, params, opt_state = teacher_train_step(
                     classifier,
                     criterion,
                     optimizer.update,
@@ -745,7 +769,7 @@ def main(args):
                     losses,
                     (params, explainer_params),
                     opt_state,
-                ) = train_step_with_teacher(
+                ) = student_train_step(
                     task_type,
                     classifier,
                     explainer,
@@ -776,12 +800,11 @@ def main(args):
             if (
                 args.setup == "learnable_teacher"
                 and step % args.meta_interval == 0
-                and epoch >= args.meta_warmup
                 and (args.num_resets == 0 or resets < args.num_resets)
             ):
                 valid_x, valid_y = next(valid_dataloader)
-                grads, teacher_explainer_params, metaopt_state = metatrain_step(
-                    args.meta_explicit,
+                _, teacher_explainer_params, metaopt_state = explainer_train_step(
+                    args.implicit_differentiation,
                     task_type,
                     classifier,
                     explainer,
@@ -804,11 +827,6 @@ def main(args):
                     args.kld_coeff,
                     inner_lr=args.learning_rate,
                 )
-                if args.log_teacher_params is not None:
-                    param_str = flax.core.unfreeze(
-                        jax.tree_map(jnp.array_str, teacher_explainer_params)
-                    )
-                    print(json.dumps(param_str), file=log_teacher_params_f)
                 if resets < args.num_resets:
                     opt_state, params, explainer_params = (
                         init_opt_state,
