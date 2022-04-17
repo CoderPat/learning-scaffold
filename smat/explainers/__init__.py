@@ -178,6 +178,8 @@ class SaliencyExplainer(Explainer, metaclass=ABCMeta):
             return sparsemax
         elif self.normalizer_fn == "entmax":
             return entmax15
+        elif self.normalizer_fn == "id":
+            return lambda x: x
         else:
             return self.normalizer_fn
 
