@@ -37,6 +37,7 @@ def train_explainer(
     explainer_args: dict = {},
     explanation_regularizer: float = 1.0,
     batch_size: int = 16,
+    max_epochs: int = 100,
     patience: int = 5,
     student_optimizer: str = "sgd",
     student_lr: float = 5e-3,
@@ -67,6 +68,7 @@ def train_explainer(
         explainer_args: The arguments to pass to the explainer constructor
         explanation_regularizer: The regularization factor for the explanation loss
         batch_size: The batch size to use for training
+        max_epochs: The maximum number of epochs to use for training
         patience: The patience to use for early stopping
         student_optimizer: The optimizer to use for training the student model
         student_lr: The learning rate to use for training the student model
@@ -183,7 +185,6 @@ def train_explainer(
         metric_value = metric(all_outputs, all_y)
         return loss, metric_value
 
-    max_epochs = 100
     step = 0
     not_improved = 0
     best_metric = float("-inf")

@@ -8,7 +8,8 @@ import flax
 
 # ## Get dataset and define dataloader
 #
-# First we need to get the SST-2 data. We will use HF's dataset since it is already very compatible with the smat library.
+# First we need to get the SST-2 data. We will use HF's dataset since it is already
+# very compatible with the smat library.
 
 # +
 from datasets import load_dataset
@@ -28,8 +29,8 @@ valid_data = load_data("valid")
 num_classes = 2
 # -
 
-# We also need to define the dataloader, which will create for the model
-# to consume
+# We also need to define the dataloader, which is going to create batches that
+# are going to be consumed by the model
 
 # +
 from typing import List, Dict
@@ -73,8 +74,8 @@ def dataloader(
 
 # ## Define Wrapped Model
 #
-# Next we need to define a wrapper class for our BERT model
-# This is not strictly necessary, however it makes integration
+# Next we need to define a wrapper class for our BERT model.
+# This is not strictly necessary, but it makes integration
 # with the smat library much easier 
 
 from transformers import FlaxBertForSequenceClassification, BertConfig
@@ -166,9 +167,9 @@ tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
 
 # ## Getting the trained model (the teacher)
 
-# to get the teacher model, we simplify and use an existing model
+# To get the teacher model, we take a simple approach and use an existing model
 # on the hugginface hub. We also also need an example input
-# for jax's shape inference, we we just use the first batch in the dataset 
+# for jax's shape inference, for which we will just use the first batch in the dataset 
 
 # +
 from smat.utils import PRNGSequence
@@ -186,12 +187,12 @@ model, params = WrappedBert.initialize_new_model(
 
 # ## Training an explainer
 #
-# Finally, we a ready to train a explainer model. `smat.compact` provides
-# a convenient wrapper that trains a student and both explainer using
+# Finally, we are ready to train an explainer model. `smat.compact` provides
+# a convenient wrapper that trains a student and an explainer using
 # the SMAT framework. Some options to consider for this function are the number 
-# samples to train your student with and student model to use. In this case
-# we are going to use 10% of the training data, and will make convinient use
-# of the default bert model defined by the `register_model` decorator,
+# of samples used to train the student model. In this example we are going to use 
+# 10% of the training data for a single epoch, and will make convinient use
+# of the default bert model defined by the `register_model` decorator.
 
 
 # +
@@ -207,6 +208,7 @@ explainer, expl_params = train_explainer(
     valid_dataset=valid_data,
     num_examples=0.1,
     student_model="bert",
+    max_epochs=1,
 )
 
 
@@ -222,6 +224,82 @@ def predict_and_explain(sample):
     return y, explanation
 
 
-text="This is a test"
+text = "Still, this flick is fun, and host to some truly excellent sequences."
 batch = dict(tokenizer([text],return_tensors="jax"))
-print(predict_and_explain(batch))
+y_pred, expl = predict_and_explain(batch)
+print(y_pred.argmax())
+print(expl)
+
+# ## Visualizing the head coefficients
+#
+# We will recover the learned head coefficients and reapply the sparsemax transformation
+# to see the actual weight that each head received.
+
+# +
+import numpy as np
+from matplotlib import pyplot as plt
+from entmax_jax.activations import sparsemax
+
+# 12 layers * 12 heads
+head_coeffs = sparsemax(expl_params['params']['head_coeffs']).reshape(12, 12)
+head_coeffs = np.asarray(head_coeffs)
+
+fig, ax = plt.subplots(figsize=(4, 4))
+ax.set_xticks(list(range(12)))
+ax.set_yticks(list(range(12)))
+ax.set_xlabel('Head')
+ax.set_ylabel('Layer')
+ax.set_title('Head coefficients')
+ax.imshow(head_coeffs, cmap='Greens')
+
+
+# -
+
+# As expected, the explainer learns that some heads are more relevant than others. 
+# Sparsemax help to filter out irrelevant heads by assigning zero probability (this
+# becomes more evidenced as training progresses).
+
+# ## Visualizing the explanation
+#
+# First we will define a helper function to print HTML stuff.
+
+def show_explanation(tokens, expl_scores, method='smat'):
+    from IPython.display import display, HTML
+    span_style_pos = 'color: black; background-color: rgba(3, 252, 94, {}); display:inline-block;'
+    span_style_neg = 'color: black; background-color: rgba(252, 161, 3, {}); display:inline-block;'
+    template_pos = '<span style="'+span_style_pos+'">&nbsp;{}&nbsp;</span>'
+    template_neg = '<span style="'+span_style_neg+'">&nbsp;{}&nbsp;</span>'
+    colored_string = ''
+    f = lambda w: w.replace('<', 'ᐸ').replace('>', 'ᐳ')
+    for token, score in zip(tokens, expl_scores):
+        if score >= 0:
+            colored_string += template_pos.format(score, f(token))
+        else:
+            colored_string += template_neg.format(-score, f(token))
+    html_text = '<div style="width:100%;">{}: {}</div>'.format(method, colored_string)
+    display(HTML(html_text))
+
+
+# Now we can try just call the `show_explanation` function to see
+# our explanations as highlights. Note that we can try many different
+# strategies for normalizing explainability scores. 
+
+# +
+# normalization strategies
+sum_norm = lambda v: v / v.sum()
+minmax_norm = lambda v: (v - v.min()) / (v.max() - v.min())
+std_norm = lambda v: (v - v.mean()) / v.std()
+abs_norm = lambda v: v / np.max(np.abs(v))
+
+# recover data
+input_ids = np.asarray(batch['input_ids'])[0]
+input_tokens = tokenizer.convert_ids_to_tokens(input_ids)
+pred_expl = np.asarray(expl)[0]
+pred_label = y_pred.argmax()
+
+# remove <s> and </s> and show the explanation as highlights
+show_explanation(
+    tokens=input_tokens[1:-1], 
+    expl_scores=abs_norm(pred_expl[1:-1]), 
+    method='SMAT ({})'.format(pred_label)
+)
