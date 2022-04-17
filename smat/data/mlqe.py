@@ -9,7 +9,7 @@ from transformers import PreTrainedTokenizerFast
 
 def load_data(setup: str, split: str, seed: int = 0, eval_lp=None):
     split_n = "dev" if split == "valid" else split
-    if eval_lp is not None and split in ['valid', 'test']:
+    if eval_lp is not None and split in ["valid", "test"]:
         langpairs = [eval_lp]
     else:
         langpairs = ["en-de", "en-zh", "et-en", "ne-en", "ro-en", "ru-en"]

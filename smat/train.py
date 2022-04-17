@@ -210,10 +210,7 @@ def read_args():
         default=None,
         help="Directory to save the trained teacher explainer. ",
     )
-    parser.add_argument(
-        "--do-save",
-        action="store_true"
-    )
+    parser.add_argument("--do-save", action="store_true")
 
     # Logging
     parser.add_argument(
@@ -843,15 +840,23 @@ def main(args):
             # copy because of buffer donation
             best_params = jax.tree_map(lambda a: jnp.array(a, copy=True), params)
             if args.model_dir is not None and args.do_save:
-                print('Saving student: ', args.model_dir)
+                print("Saving student: ", args.model_dir)
                 save_model(args.model_dir, classifier, params)
 
-            if args.setup != "no_teacher" and args.explainer_dir is not None and args.do_save:
-                print('Saving student explainer: ', args.explainer_dir)
+            if (
+                args.setup != "no_teacher"
+                and args.explainer_dir is not None
+                and args.do_save
+            ):
+                print("Saving student explainer: ", args.explainer_dir)
                 save_explainer(args.explainer_dir, explainer, explainer_params)
 
-            if args.setup != "no_teacher" and args.teacher_explainer_dir is not None and args.do_save:
-                print('Saving teacher explainer: ', args.teacher_explainer_dir)
+            if (
+                args.setup != "no_teacher"
+                and args.teacher_explainer_dir is not None
+                and args.do_save
+            ):
+                print("Saving teacher explainer: ", args.teacher_explainer_dir)
                 save_explainer(
                     args.teacher_explainer_dir,
                     teacher_explainer,

@@ -23,18 +23,14 @@ class AttentionExplainer(SaliencyExplainer):
 
     """
 
-<<<<<<< HEAD:meta_expl/explainers/attention_explainer.py
     aggregator_idx: Union[
         int, str
     ] = "mean"  # corresponds to [CLS] in most tokenizations
     aggregator_dim: str = "row"
-    layer_idx: int = -1  # layer from which to use attention from
     head_idx: int = None  # head from which to use attention from
-=======
     normalize_head_coeffs: bool = "sparsemax"
     aggregator_idx: Union[int, str] = "mean"
     layer_idx: int = None
->>>>>>> public-release:smat/explainers/attention_explainer.py
     init_fn: Union[Callable, str] = "uniform"
 
     def prepare_init(self):
