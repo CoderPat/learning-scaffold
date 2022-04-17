@@ -1,4 +1,4 @@
-# Scaffold-Maximizing Training (SMAT)
+# Scaffold-Maximizing Training (SMaT)
 
 This is the official implementation for the paper 
 *[Learning to Scaffold: Optimizing Model Explanations for Teaching]()*.
