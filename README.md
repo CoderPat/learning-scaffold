@@ -1,8 +1,7 @@
 
-![build](https://github.com/coderpat/learning-scaffold/actions/workflows/pylint.yaml/badge.svg)
-
 Scaffold-Maximizing Training (SMaT)
 ===
+![build](https://github.com/coderpat/learning-scaffold/actions/workflows/pylint.yaml/badge.svg)
 
 This is the official implementation for the paper 
 *[Learning to Scaffold: Optimizing Model Explanations for Teaching]()*.
