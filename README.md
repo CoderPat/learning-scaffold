@@ -1,5 +1,4 @@
-
-![build](https://github.com/coderpat/learning-scaffold/actions/workflows/pylint.yaml/badge.svg)
+[![Python Lint](https://github.com/CoderPat/learning-scaffold/actions/workflows/pylint.yml/badge.svg?branch=public-release)](https://github.com/CoderPat/learning-scaffold/actions/workflows/pylint.yml)
 
 Scaffold-Maximizing Training (SMaT)
 ===
