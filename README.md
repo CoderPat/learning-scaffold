@@ -94,20 +94,26 @@ python smat/train.py \
 
 ## Workflows
 
-To run experiments using the workflow manager [ducttape](https://github.com/jhclark/ducttape), modify the relevant variables in `tapes/main.tconf`.
-Also place [these scripts](https://gist.github.com/CoderPat/daa604ddb3d5a779dc2029509552e013) somewhere in your `$PATH`
+To run experiments using the workflow manager [ducttape](https://github.com/jhclark/ducttape).
+For parallel jobs, also place [these scripts](https://gist.github.com/CoderPat/daa604ddb3d5a779dc2029509552e013) somewhere in your `$PATH`
 
-Then run the experiments using 
+The experiments are organized into two files 
+
+* `tapes/main.tape`: This contains the task definitions. It's where you should add new tasks and functionally or edit previously defined ones.
+* `tapes/EXPERIMENT_NAME.tconf`: This is where you define the variables for experiments, as well as which tasks to run.
+
+To start off, we recommend creating you own copy of `tapes/imdb.tconf`. 
+This file is organized into two parts: (1) the variable definitions at the `global` block (2) the plan definition
+
+To start off, you need to edit the variables to correspond to paths in your file systems. 
+Examples include the `$repo` variable and the data variables.
+
+Then try running one of the existing plans by executing
 
 ```bash
-ducttape tapes/main.tape -C tapes/main.tconf -p TrainStudent -j $num_parallel_jobs
+ducttape tapes/main.tape -C $my_tconf -p PaperResults -j $num_jobs
 ```
 
-You can then get a summary of the results by running 
-
-```bash
-ducttape tapes/main.tape -C tapes/main.tconf summary 
-```
 
 ## Annotation Tool for Visual Explanations
 

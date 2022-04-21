@@ -110,7 +110,7 @@ class WrappedBert(WrappedModel):
         if attention_mask is None:
             attention_mask = jnp.ones_like(input_ids)
 
-        _, hidden_states, attentions = self.bert_module(
+        outputs, hidden_states, attentions = self.bert_module(
             input_ids,
             attention_mask=attention_mask,
             token_type_ids=token_type_ids,
@@ -120,11 +120,6 @@ class WrappedBert(WrappedModel):
             unnorm_attention=True,
             deterministic=deterministic,
             return_dict=False,
-        )
-
-        outputs = self.scalarmix(hidden_states, attention_mask)
-        outputs = self.bert_module.classifier(
-            outputs[:, None, :],
         )
 
         state = {"hidden_states": hidden_states, "attentions": attentions}
