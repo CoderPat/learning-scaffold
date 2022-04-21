@@ -8,7 +8,18 @@ This is the official implementation for the paper
 
 <hr />
 
-> **Abstract:** *While many recent works propose methods for extracting explanations from opaque machine learning models, the lack of clear goals for these methods make it hard to not only evaluate them but also design new, better ones. In this work, we introduce a framework for automatically learning to extract explanations from a teacher model by directly optimizing them to help students learn to simulate said teacher, which we name SMAT, and propose a concrete solution based on higher-order differentiation. We also propose a method for extracting explanations from attention-based models that can be directly optimized with our framework. We train models on text classification, quality estimation and image classification tasks and find that students trained with explanations extracted with our framework are able to simulate the teacher much more effectively than ones trained with previously proposed methods. Through human annotations and a user study, we also find that these learned explanations more closely align with how humans would explain their decisions in these tasks.*
+> **Abstract:** *Modern machine learning models are opaque, and as a result there is a burgeoning academic subfield
+on methods that explain these models’ behavior. However, what is the precise goal of providing
+such explanations, and how can we demonstrate that explanations achieve this goal? Some research
+argues that explanations should help teach a student (either human or machine) to simulate the model
+being explained, and that the quality of explanations can be measured by the simulation accuracy
+of students on unexplained examples. In this work, leveraging meta-learning techniques, we extend
+this idea to improve the quality of the explanations themselves by optimizing them to improve the
+training of student models to simulate original model. We train models on three natural language
+processing and computer vision tasks, and find that students trained with explanations extracted with
+our framework are able to simulate the teacher significantly more effectively than ones produced with
+previous methods. Through human annotations and a user study, we further find that these learned
+explanations more closely align with how humans would explain the required decisions in these tasks.*
 <hr />
 
 ## Requirements
