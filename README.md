@@ -4,7 +4,7 @@ Scaffold-Maximizing Training (SMaT)
 [![Python Lint](https://github.com/CoderPat/learning-scaffold/actions/workflows/pylint.yml/badge.svg)](https://github.com/CoderPat/learning-scaffold/actions/workflows/pylint.yml)
 
 This is the official implementation for the paper 
-*[Learning to Scaffold: Optimizing Model Explanations for Teaching]()*.
+*[Learning to Scaffold: Optimizing Model Explanations for Teaching](https://coderpat.github.io/public/publications/fernandes22scaffold.pdf)*.
 
 <hr />
 
@@ -44,6 +44,7 @@ pip install -r requirements.txt
 The smat package contains a wrapper function that allows you to quickly train explainers for your model. All you need to do is wrap your model into a special class, and define some parameters for smat.
 
 ```python
+import jax, flax
 from smat import *
 
 # wrap model with
@@ -68,6 +69,8 @@ explainer, expl_params = smat.compact.train_explainer(
 ```
 
 See the [example](/example.py) for a more concrete case on applying SMAT to explain BERT predictions on STT-2 (not in the paper!)
+
+Please report any bugs you find by opening an issue.
 
 ## Train models and explainers
 
