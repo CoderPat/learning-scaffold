@@ -203,7 +203,7 @@ explainer, expl_params = train_explainer(
     valid_dataset=valid_data,
     num_examples=0.1,
     student_model="bert",
-    max_epochs=1,
+    max_epochs=5,
 )
 
 
