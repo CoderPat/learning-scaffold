@@ -1,10 +1,10 @@
-jax==0.2.26
-jaxlib==0.1.72
+jax
+jaxlib
 datasets
 optax
 pkbar
 wandb
 # Flax and Transfomers Fork
-git+git://github.com/CoderPat/flax.git@custom-attention#egg=flax
-git+git://github.com/deep-spin/entmax-jax.git@add-losses#egg=entmax-jax
-git+git://github.com/CoderPat/transformers.git@unnormalized-attention#egg=transformers
+git+https://git@github.com/CoderPat/transformers.git@unnormalized-attention#egg=transformers
+git+https://git@github.com/CoderPat/flax.git@custom-attention#egg=flax
+git+https://git@github.com/deep-spin/entmax-jax.git@add-losses#egg=entmax-jax
