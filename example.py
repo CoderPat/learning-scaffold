@@ -81,7 +81,6 @@ def dataloader(
 from transformers import FlaxBertForSequenceClassification, BertConfig
 from transformers.models.bert.modeling_flax_bert import FlaxBertForSequenceClassificationModule
 from smat.models import WrappedModel, register_model
-from smat.models.scalar_mix import ScalarMix
 
 
 @register_model("bert")
@@ -187,7 +186,7 @@ model, params = WrappedBert.initialize_new_model(
 # the SMAT framework. Some options to consider for this function are the number 
 # of samples used to train the student model. In this example we are going to use 
 # 10% of the training data for a single epoch, and will make convinient use
-# of the default bert model defined by the `register_model` decorator.
+# of the default bert model defined by the `register_model` decorator. **NOTE**: the hyperparameters weren't tuned, so you might obtain better explainers by playing with those.
 
 
 # +
@@ -219,7 +218,7 @@ def predict_and_explain(sample):
     return y, explanation
 
 
-text = "Still, this flick is fun, and host to some truly excellent sequences."
+text = "Though everything might be literate and smart , it never took off and always seemed static ."
 batch = dict(tokenizer([text],return_tensors="jax"))
 y_pred, expl = predict_and_explain(batch)
 print(y_pred.argmax())
@@ -295,6 +294,6 @@ pred_label = y_pred.argmax()
 # remove <s> and </s> and show the explanation as highlights
 show_explanation(
     tokens=input_tokens[1:-1], 
-    expl_scores=abs_norm(pred_expl[1:-1]), 
+    expl_scores=minmax_norm(pred_expl[1:-1]), 
     method='SMAT ({})'.format(pred_label)
 )
