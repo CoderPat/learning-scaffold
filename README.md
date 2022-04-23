@@ -120,7 +120,7 @@ To start off, we recommend creating you own copy of `tapes/imdb.tconf`.
 This file is organized into two parts: (1) the variable definitions at the `global` block (2) the plan definition
 
 To start off, you need to edit the variables to correspond to paths in your file systems. 
-Examples include the `$repo` variable and the data variables.
+Examples include the `$repo` variable and the ducttape output folder.
 
 Then try running one of the existing plans by executing
 
