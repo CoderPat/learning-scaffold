@@ -53,7 +53,8 @@ class BertModel(nn.Module):
             outputs[:, None, :], deterministic=deterministic
         )
 
-        state = {"hidden_states": hidden_states, "attentions": attentions}
+        values = self.extract_value_vectors(hidden_states)
+        state = {"hidden_states": hidden_states, "attentions": attentions, "values": values}
         return outputs, state
 
     # define gradient over embeddings
@@ -88,3 +89,15 @@ class BertModel(nn.Module):
         return params["params"]["FlaxBertForSequenceClassificationModule_0"]["bert"][
             "embeddings"
         ]["word_embeddings"]["embedding"]
+
+    def get_value_vectors(self, hidden_states):
+        values = []
+        for i in range(self.config.num_hidden_layers):
+            hidden_state_layer = hidden_states[i]
+            value_layer = self.bert_module.bert.encoder.layer.layers[i].attention.self.value
+            head_dim = self.config.hidden_size // self.config.num_attention_heads
+            value_states = value_layer(hidden_state_layer).reshape(
+                hidden_states.shape[:2] + (self.config.num_attention_heads, head_dim)
+            )
+            values.append(value_states)
+        return values

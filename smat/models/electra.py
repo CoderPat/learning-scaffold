@@ -57,11 +57,13 @@ class ElectraModel(WrappedModel):
         outputs = self.electra_module.classifier(
             outputs[:, None, :], deterministic=deterministic
         )
+        values = self.get_value_vectors(hidden_states)
 
         state = {
             "outputs": outputs,
             "hidden_states": hidden_states,
             "attentions": attentions,
+            "values": values,
         }
         return outputs, state
 
@@ -159,3 +161,15 @@ class ElectraModel(WrappedModel):
         params = flax.core.freeze(params)
 
         return classifier, params
+
+    def get_value_vectors(self, hidden_states):
+        values = []
+        for i in range(self.config.num_hidden_layers):
+            hidden_state_layer = hidden_states[i]
+            value_layer = self.electra_module.electra.encoder.layer.layers[i].attention.self.value
+            head_dim = self.config.hidden_size // self.config.num_attention_heads
+            value_states = value_layer(hidden_state_layer).reshape(
+                hidden_states.shape[:2] + (self.config.num_attention_heads, head_dim)
+            )
+            values.append(value_states)
+        return values
