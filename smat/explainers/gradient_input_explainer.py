@@ -12,6 +12,7 @@ class GradientInputExplainer(SaliencyExplainer):
     """
 
     temperature: float = 0.1
+    ord: int = 0
 
     def logit_computation(self, inputs, state, grad_fn, **model_extras):
         """
@@ -28,4 +29,8 @@ class GradientInputExplainer(SaliencyExplainer):
             word_embeddings,
             y,
         )
-        return jnp.einsum("bij,bij->bi", grads, word_embeddings) / self.temperature
+        if self.ord > 0:
+            ret = jnp.linalg.norm(grads * word_embeddings, self.ord, axis=-1)
+        else:
+            ret = jnp.einsum("bij,bij->bi", grads, word_embeddings)
+        return ret / self.temperature
