@@ -81,8 +81,8 @@ python smat/train.py \
       --setup no_teacher \
       --task $task \
       --arch $arch \
-      --model-dir $teacher_dir
-
+      --model-dir $teacher_dir \
+      --do-save
 ```
 
 To train a student model learning from this teacher model with `num_samples` training examples, run
@@ -93,7 +93,8 @@ python smat/train.py \
       --task $task \
       --arch $arch \
       --num-examples $num_examples \
-      --teacher-dir $teacher_dir 
+      --teacher-dir $teacher_dir \
+      --do-save
 ```
 
 Finally to train a student model AND an explainer for the teacher run
@@ -103,7 +104,8 @@ python smat/train.py \
       --setup learnable_teacher \
       --num-examples $num_examples \
       --teacher-dir $teacher_dir 
-      --teacher-explainer-dir $teacher_explainer_dir
+      --teacher-explainer-dir $teacher_explainer_dir \
+      --do-save
 ```
 
 ## Workflows
