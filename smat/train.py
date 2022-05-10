@@ -290,9 +290,12 @@ def student_train_step(
 
     teacher_extras = {}
     if hasattr(teacher, "embeddings_grad_fn"):
+        gradient_method = teacher.embeddings_grad_fn
+        if hasattr(teacher_explainer, "gradient_wrt") and teacher_explainer.gradient_wrt == 'attention':
+            gradient_method = teacher.attention_grad_fn
         teacher_extras = {
             "grad_fn": teacher.apply(
-                teacher_params, x, method=teacher.embeddings_grad_fn
+                teacher_params, x, method=gradient_method
             )
         }
 
@@ -315,9 +318,12 @@ def student_train_step(
         # compute explanations based on attention for both teacher and student
         student_extras = {}
         if hasattr(student, "embeddings_grad_fn"):
+            gradient_method = student.embeddings_grad_fn
+            if hasattr(student_explainer, "gradient_wrt") and student_explainer.gradient_wrt == 'attention':
+                gradient_method = student_explainer.attention_grad_fn
             student_extras = {
                 "grad_fn": student.apply(
-                    student_params, x, method=student.embeddings_grad_fn
+                    student_params, x, method=gradient_method
                 )
             }
         student_expl, expl_extras = student_explainer.apply(
@@ -394,9 +400,12 @@ def explainer_train_step(
 
     teacher_extras = {}
     if hasattr(teacher, "embeddings_grad_fn"):
+        gradient_method = teacher.embeddings_grad_fn
+        if hasattr(teacher_explainer, "gradient_wrt") and teacher_explainer.gradient_wrt == 'attention':
+            gradient_method = teacher.attention_grad_fn
         teacher_extras = {
             "grad_fn": teacher.apply(
-                teacher_params, train_x, method=teacher.embeddings_grad_fn
+                teacher_params, train_x, method=gradient_method
             )
         }
 
@@ -416,9 +425,12 @@ def explainer_train_step(
         # compute explanations
         student_extras = {}
         if hasattr(student, "embeddings_grad_fn"):
+            gradient_method = student.embeddings_grad_fn
+            if hasattr(student_explainer, "gradient_wrt") and student_explainer.gradient_wrt == 'attention':
+                gradient_method = student.attention_grad_fn
             student_extras = {
                 "grad_fn": student.apply(
-                    student_params, train_x, method=student.embeddings_grad_fn
+                    student_params, train_x, method=gradient_method
                 )
             }
         student_expl, expl_extras = student_explainer.apply(
@@ -618,6 +630,11 @@ def main(args):
             model_dir=args.teacher_dir,
             inputs=dummy_inputs,
         )
+        gradient_method = teacher.embeddings_grad_fn
+        if 'gradient' in args.teacher_explainer and 'attention' in args.teacher_explainer:
+            gradient_method = teacher.attention_grad_fn
+        elif 'attribution' in args.teacher_explainer and 'attention' in args.teacher_explainer:
+            gradient_method = teacher.attention_grad_fn
         teacher_explainer, teacher_explainer_params = create_explainer(
             key=next(keyseq),
             inputs=dummy_inputs,
@@ -626,7 +643,7 @@ def main(args):
             explainer_args=args.teacher_explainer_params,
             model_extras={
                 "grad_fn": teacher.apply(
-                    teacher_params, dummy_inputs, method=teacher.embeddings_grad_fn
+                    teacher_params, dummy_inputs, method=gradient_method
                 )
             },
         )
@@ -646,6 +663,11 @@ def main(args):
         max_len=args.max_len,
         embeddings=embeddings,
     )
+    gradient_method = classifier.embeddings_grad_fn
+    if 'gradient' in args.teacher_explainer and 'attention' in args.teacher_explainer:
+        gradient_method = classifier.attention_grad_fn
+    elif 'attribution' in args.teacher_explainer and 'attention' in args.teacher_explainer:
+        gradient_method = classifier.attention_grad_fn
     explainer, explainer_params = create_explainer(
         key=next(keyseq),
         inputs=dummy_inputs,
@@ -654,7 +676,7 @@ def main(args):
         explainer_args=args.explainer_params,
         model_extras={
             "grad_fn": classifier.apply(
-                params, dummy_inputs, method=classifier.embeddings_grad_fn
+                params, dummy_inputs, method=gradient_method
             )
         },
     )

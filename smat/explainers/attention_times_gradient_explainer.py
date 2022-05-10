@@ -10,7 +10,9 @@ class AttentionTimesGradientExplainer(SaliencyExplainer):
     """
 
     temperature: float = 1
+    layer_idx: int = None
     ord: int = 0
+    gradient_wrt = 'attention'
 
     def logit_computation(self, inputs, state, grad_fn, **model_extras):
         """
@@ -30,7 +32,19 @@ class AttentionTimesGradientExplainer(SaliencyExplainer):
         word_embeddings = state["hidden_states"][0]
         y = jnp.argmax(state["outputs"], axis=-1)
 
-        # TODO: implement grad_fn w.r.t. attention probabilities
-        grads = grad_fn(word_embeddings, head_attentions, y,)
-        ret = grads * head_attentions
+        if self.layer_idx is None:
+            head_gradients = [grad_fn(a, word_embeddings, y) for a in all_attentions]
+            head_gradients = jnp.concatenate(head_gradients, axis=1)
+        else:
+            head_gradients = grad_fn(all_attentions[self.layer_idx], word_embeddings, y)
+
+        # summarize gradient for each query
+        if self.ord > 0:
+            ret = jnp.linalg.norm(head_gradients * head_attentions, self.ord, axis=-1)
+        else:
+            ret = jnp.sum(head_gradients * head_attentions, axis=-1)
+
+        # average all heads from all layers
+        ret = jnp.mean(ret, axis=1)
+
         return ret / self.temperature

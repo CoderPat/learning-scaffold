@@ -180,6 +180,8 @@ class SaliencyExplainer(Explainer, metaclass=ABCMeta):
             return entmax15
         elif self.normalizer_fn == "id":
             return lambda x: x
+        elif self.normalizer_fn == "norm":
+            return lambda x: x / jnp.sum(x, axis=-1, keepdims=True)
         else:
             return self.normalizer_fn
 
