@@ -159,6 +159,14 @@ def load_explainer(
     return explainer, params
 
 
+def average_normalizer(x, axis=-1):
+    return x / jnp.sum(x, axis=axis, keepdims=True)
+
+
+def id_normalizer(x, axis=-1):
+    return x
+
+
 class SaliencyExplainer(Explainer, metaclass=ABCMeta):
     """
     Represents and explainer that produces *saliency maps* as explanations
@@ -179,9 +187,9 @@ class SaliencyExplainer(Explainer, metaclass=ABCMeta):
         elif self.normalizer_fn == "entmax":
             return entmax15
         elif self.normalizer_fn == "id":
-            return lambda x: x
-        elif self.normalizer_fn == "norm":
-            return lambda x: x / jnp.sum(x, axis=-1, keepdims=True)
+            return id_normalizer
+        elif self.normalizer_fn == "average":
+            return average_normalizer
         else:
             return self.normalizer_fn
 
@@ -240,8 +248,10 @@ class SaliencyExplainer(Explainer, metaclass=ABCMeta):
         if (
             student_explainer.normalizer_fn == "softmax"
             and teacher_explainer.normalizer_fn
-            in ("sparsemax", "entmax15", "softmax", "topk_softmax")
+            in ("sparsemax", "entmax15", "softmax", "id", "average", "topk_softmax")
         ):
+            if teacher_explainer.normalizer_fn == "id":
+                print('Warning! Make sure your input is a valid probability distribution.')
             return softmax_loss(
                 student_explanation,
                 teacher_explanation,
