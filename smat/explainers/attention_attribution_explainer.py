@@ -13,7 +13,7 @@ class AttentionAttributionExplainer(SaliencyExplainer):
     n_steps: int = 10
     ord: int = 0
     layer_idx: int = None
-    gradient_wrt = 'attention'
+    gradient_wrt: str = 'attention'
 
     def logit_computation(self, inputs, state, grad_fn, **model_extras):
         """

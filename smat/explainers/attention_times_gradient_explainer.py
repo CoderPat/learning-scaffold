@@ -12,7 +12,7 @@ class AttentionTimesGradientExplainer(SaliencyExplainer):
     temperature: float = 1
     layer_idx: int = None
     ord: int = 0
-    gradient_wrt = 'attention'
+    gradient_wrt: str = 'attention'
 
     def logit_computation(self, inputs, state, grad_fn, **model_extras):
         """
