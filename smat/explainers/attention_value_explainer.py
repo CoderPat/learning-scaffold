@@ -24,9 +24,6 @@ class AttentionValueExplainer(SaliencyExplainer):
 
     """
 
-    aggregator_idx: Union[
-        int, str
-    ] = "mean"  # corresponds to [CLS] in most tokenizations
     aggregator_dim: str = "row"
     head_idx: int = None  # head from which to use attention from
     normalize_head_coeffs: bool = "sparsemax"
@@ -75,10 +72,8 @@ class AttentionValueExplainer(SaliencyExplainer):
             if self.layer_idx is None
             else all_values[self.layer_idx]
         )
-        ijk = list(range(len(head_values.shape)))
-        head_values = head_values.transpose(ijk[:-2] + ijk[-2:][::-1])  # permute to [B, L, H, N, D]
-
-        head_attentions = head_attentions * jnp.linalg.norm(head_values, ord=2, axis=-1)
+        norm_values = jnp.linalg.norm(head_values, ord=2, axis=-1, keepdims=True)
+        head_attentions = head_attentions * norm_values.swapaxes(-1, -2)
 
         headcoeffs = self.param(
             "head_coeffs",
