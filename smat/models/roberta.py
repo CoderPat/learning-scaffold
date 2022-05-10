@@ -211,6 +211,6 @@ class RobertaModel(WrappedModel):
             head_dim = self.config.hidden_size // self.config.num_attention_heads
             value_states = value_layer(hidden_state_layer).reshape(
                 hidden_state_layer.shape[:2] + (self.config.num_attention_heads, head_dim)
-            )
+            ).transpose((0, 2, 1, 3))
             values.append(value_states)
         return values
