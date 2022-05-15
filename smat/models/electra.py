@@ -118,12 +118,8 @@ class ElectraModel(WrappedModel):
 
     def extract_embeddings(self, params):
         return (
-            params["params"]["FlaxElectraForSequenceClassificationModule_0"]["electra"][
-                "embeddings"
-            ]["word_embeddings"]["embedding"],
-            params["params"]["FlaxElectraForSequenceClassificationModule_0"]["electra"][
-                "embeddings"
-            ]["position_embeddings"]["embedding"],
+            params['params']['electra_module']['electra']['embeddings']['word_embeddings']['embedding'],
+            params['params']['electra_module']['electra']['embeddings']["position_embeddings"]["embedding"],
         )
 
     @staticmethod
