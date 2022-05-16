@@ -12,7 +12,6 @@ do
       --explainer-params "{\"normalizer_fn\": \"softmax\", \"normalize_head_coeffs\": \"sparsemax\", \"aggregator_idx\": \"mean\", \"aggregator_dim\": \"row\", \"layer_idx\": null, \"head_idx\": null}" \
       --teacher-explainer gradient_input_explainer \
       --teacher-explainer-params "{\"normalizer_fn\": \"softmax\", \"ord\": 2}" \
-      --initialize-embeddings \
       --optimizer sgd \
       --patience 5 \
       --learning-rate 5e-3 \

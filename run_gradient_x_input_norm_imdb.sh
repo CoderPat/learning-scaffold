@@ -3,7 +3,7 @@ for seed in 0 9 11 30 69
 do
   for num_ex in 1000 500 2000
   do
-    CUDA_VISIBLE_DEVICES=4 python3 smat/train.py \
+    CUDA_VISIBLE_DEVICES=7 python3 smat/train.py \
       --task imdb \
       --setup static_teacher \
       --arch electra \

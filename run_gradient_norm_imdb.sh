@@ -1,7 +1,7 @@
 
 for seed in 0 9 11 30 69
 do
-  for num_ex in 4100 2100 8400
+  for num_ex in 1000 500 2000
   do
     CUDA_VISIBLE_DEVICES=7 python3 smat/train.py \
       --task imdb \
