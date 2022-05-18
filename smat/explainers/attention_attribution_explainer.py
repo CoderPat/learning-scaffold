@@ -6,14 +6,13 @@ from . import SaliencyExplainer, register_explainer
 
 @register_explainer("attention_attribution_explainer")
 class AttentionAttributionExplainer(SaliencyExplainer):
-    """
-    """
+    """"""
 
     temperature: float = 0.1
     n_steps: int = 10
     ord: int = 0
     layer_idx: int = None
-    gradient_wrt: str = 'attention'
+    gradient_wrt: str = "attention"
 
     def logit_computation(self, inputs, state, grad_fn, **model_extras):
         """
@@ -39,12 +38,18 @@ class AttentionAttributionExplainer(SaliencyExplainer):
             # compute rienman delta (halved in the edges)
             delta = 1 / (self.n_steps * (2 - (jnp.minimum(i % (self.n_steps - 1), 1))))
             # compute rienman area and add to total integral estimate
-            head_attentions = baselines + (head_attentions - baselines) * (i / (self.n_steps - 1)) * delta
+            head_attentions = (
+                baselines
+                + (head_attentions - baselines) * (i / (self.n_steps - 1)) * delta
+            )
             if self.layer_idx is None:
                 bs, lxh, n, n = head_attentions.shape
                 num_layers = len(all_attentions)
                 head_attentions_l = head_attentions.reshape(bs, num_layers, -1, n, n)
-                head_gradients = [grad_fn(head_attentions_l[:, l], word_embeddings, y) for l in range(num_layers)]
+                head_gradients = [
+                    grad_fn(head_attentions_l[:, ell], word_embeddings, y)
+                    for ell in range(num_layers)
+                ]
                 head_gradients = jnp.concatenate(head_gradients, axis=1)
             else:
                 head_gradients = grad_fn(head_attentions, word_embeddings, y)

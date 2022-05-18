@@ -1,9 +1,5 @@
-from typing import Dict, List
-
-import jax.numpy as jnp
 from datasets import load_dataset
 from numpy import random
-from transformers import PreTrainedTokenizerFast
 
 from smat.data.imdb import resplit
 from smat.data.imdb import dataloader as dataloader_imdb

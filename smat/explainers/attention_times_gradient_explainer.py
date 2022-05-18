@@ -6,13 +6,12 @@ from . import SaliencyExplainer, register_explainer
 
 @register_explainer("attention_times_gradient_explainer")
 class AttentionTimesGradientExplainer(SaliencyExplainer):
-    """
-    """
+    """"""
 
     temperature: float = 1
     layer_idx: int = None
     ord: int = 0
-    gradient_wrt: str = 'attention'
+    gradient_wrt: str = "attention"
 
     def logit_computation(self, inputs, state, grad_fn, **model_extras):
         """

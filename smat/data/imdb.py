@@ -6,7 +6,9 @@ from numpy import random
 from transformers import PreTrainedTokenizerFast
 
 
-def resplit(setup, split, data, teacher_valid_size, student_valid_size, student_test_size):
+def resplit(
+    setup, split, data, teacher_valid_size, student_valid_size, student_test_size
+):
     # We resplit data according to teacher/student dichotomy
     # note that the teacher doesn't have a test split
     if setup == "no_teacher":

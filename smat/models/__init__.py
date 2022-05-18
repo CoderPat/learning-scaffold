@@ -179,11 +179,16 @@ def load_model(
         ), "model type doesn't have registered config"
         baseconfig = CONFIG_REGISTRY[model_type].from_dict(config["model_baseconfig"])
 
-    classifier = (
-        model_class(config=baseconfig, **config["model_args"])
-        if baseconfig is not None
-        else model_class(**config["model_args"])
-    )
+    if model_type == "electra" and "model_baseconfig" not in config:  # hacky fix
+        baseconfig = CONFIG_REGISTRY[model_type].from_dict(config["model_args"])
+        classifier = model_class(config=baseconfig, num_labels=2)
+
+    else:
+        classifier = (
+            model_class(config=baseconfig, **config["model_args"])
+            if baseconfig is not None
+            else model_class(**config["model_args"])
+        )
 
     # instantiate (dummy) model parameters
     key = jax.random.PRNGKey(0)

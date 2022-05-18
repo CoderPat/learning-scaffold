@@ -106,11 +106,10 @@ class RobertaModel(WrappedModel):
 
     # define gradient over attention
     def attention_grad_fn(
-            self,
-            inputs,
+        self,
+        inputs,
     ):
         def model_fn(attn_weights, word_embeddings, y):
-            input_ids = inputs["input_ids"]
             attention_mask = inputs["attention_mask"]
 
             _, hidden_states, _ = self.roberta_module.roberta.encoder(
@@ -139,8 +138,12 @@ class RobertaModel(WrappedModel):
     @staticmethod
     def extract_embeddings(params):
         return (
-            params['params']['roberta_module']['roberta']['embeddings']['word_embeddings']['embedding'],
-            params['params']['roberta_module']['roberta']['embeddings']["position_embeddings"]["embedding"],
+            params["params"]["roberta_module"]["roberta"]["embeddings"][
+                "word_embeddings"
+            ]["embedding"],
+            params["params"]["roberta_module"]["roberta"]["embeddings"][
+                "position_embeddings"
+            ]["embedding"],
         )
 
     @staticmethod
@@ -207,10 +210,17 @@ class RobertaModel(WrappedModel):
         values = []
         for i in range(self.config.num_hidden_layers):
             hidden_state_layer = hidden_states[i]
-            value_layer = self.roberta_module.roberta.encoder.layer.layers[i].attention.self.value
+            value_layer = self.roberta_module.roberta.encoder.layer.layers[
+                i
+            ].attention.self.value
             head_dim = self.config.hidden_size // self.config.num_attention_heads
-            value_states = value_layer(hidden_state_layer).reshape(
-                hidden_state_layer.shape[:2] + (self.config.num_attention_heads, head_dim)
-            ).transpose((0, 2, 1, 3))
+            value_states = (
+                value_layer(hidden_state_layer)
+                .reshape(
+                    hidden_state_layer.shape[:2]
+                    + (self.config.num_attention_heads, head_dim)
+                )
+                .transpose((0, 2, 1, 3))
+            )
             values.append(value_states)
         return values

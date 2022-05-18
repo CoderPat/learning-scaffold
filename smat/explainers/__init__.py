@@ -251,7 +251,9 @@ class SaliencyExplainer(Explainer, metaclass=ABCMeta):
             in ("sparsemax", "entmax15", "softmax", "id", "average", "topk_softmax")
         ):
             if teacher_explainer.normalizer_fn == "id":
-                print('Warning! Make sure your input is a valid probability distribution.')
+                print(
+                    "Warning! Make sure your input is a valid probability distribution."
+                )
             return softmax_loss(
                 student_explanation,
                 teacher_explanation,

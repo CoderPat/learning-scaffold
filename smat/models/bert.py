@@ -54,7 +54,11 @@ class BertModel(nn.Module):
         )
 
         values = self.extract_value_vectors(hidden_states)
-        state = {"hidden_states": hidden_states, "attentions": attentions, "values": values}
+        state = {
+            "hidden_states": hidden_states,
+            "attentions": attentions,
+            "values": values,
+        }
         return outputs, state
 
     # define gradient over embeddings
@@ -85,7 +89,10 @@ class BertModel(nn.Module):
 
         return jax.grad(model_fn)
 
-    def attention_grad_fn(self, inputs,):
+    def attention_grad_fn(
+        self,
+        inputs,
+    ):
         def model_fn(attn_weights, word_embeddings, y):
             _, hidden_states, _ = self.bert_module.roberta.encoder(
                 word_embeddings,
@@ -115,10 +122,17 @@ class BertModel(nn.Module):
         values = []
         for i in range(self.config.num_hidden_layers):
             hidden_state_layer = hidden_states[i]
-            value_layer = self.bert_module.bert.encoder.layer.layers[i].attention.self.value
+            value_layer = self.bert_module.bert.encoder.layer.layers[
+                i
+            ].attention.self.value
             head_dim = self.config.hidden_size // self.config.num_attention_heads
-            value_states = value_layer(hidden_state_layer).reshape(
-                hidden_state_layer.shape[:2] + (self.config.num_attention_heads, head_dim)
-            ).transpose((0, 2, 1, 3))
+            value_states = (
+                value_layer(hidden_state_layer)
+                .reshape(
+                    hidden_state_layer.shape[:2]
+                    + (self.config.num_attention_heads, head_dim)
+                )
+                .transpose((0, 2, 1, 3))
+            )
             values.append(value_states)
         return values
