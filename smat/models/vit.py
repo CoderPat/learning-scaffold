@@ -76,6 +76,26 @@ class ViTModel(WrappedModel):
 
         return jax.grad(model_fn)
 
+    def attention_grad_fn(
+        self,
+        inputs,
+    ):
+        def model_fn(attn_weights, patch_embeddings, y):
+            _, hidden_states, _ = self.vit_module.roberta.encoder(
+                patch_embeddings,
+                output_hidden_states=True,
+                output_attentions=True,
+                unnorm_attention=True,
+                deterministic=True,
+                return_dict=False,
+                attn_weights=attn_weights,
+            )
+            outputs = self.scalarmix(hidden_states)
+            outputs = self.vit_module.classifier(outputs)
+            return jnp.sum(outputs[jnp.arange(outputs.shape[0]), y], axis=0)
+
+        return jax.grad(model_fn)
+
     @staticmethod
     def convert_to_new_checkpoint(old_params):
         keymap = {
@@ -133,3 +153,22 @@ class ViTModel(WrappedModel):
         params = flax.core.freeze(params)
 
         return classifier, params
+
+    def get_value_vectors(self, hidden_states):
+        values = []
+        for i in range(self.config.num_hidden_layers):
+            hidden_state_layer = hidden_states[i]
+            value_layer = self.vit_module.vit.encoder.layer.layers[
+                i
+            ].attention.attention.value
+            head_dim = self.config.hidden_size // self.config.num_attention_heads
+            value_states = (
+                value_layer(hidden_state_layer)
+                .reshape(
+                    hidden_state_layer.shape[:2]
+                    + (self.config.num_attention_heads, head_dim)
+                )
+                .transpose((0, 2, 1, 3))
+            )
+            values.append(value_states)
+        return values

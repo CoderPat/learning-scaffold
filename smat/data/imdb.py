@@ -6,6 +6,29 @@ from numpy import random
 from transformers import PreTrainedTokenizerFast
 
 
+def resplit(
+    setup, split, data, teacher_valid_size, student_valid_size, student_test_size
+):
+    # We resplit data according to teacher/student dichotomy
+    # note that the teacher doesn't have a test split
+    if setup == "no_teacher":
+        if split == "train":
+            pass
+        elif split == "valid":
+            data = data[:teacher_valid_size]
+        elif split == "test":
+            raise ValueError("teacher model doesn't have a test split")
+    else:
+        dev_size = student_test_size + student_valid_size
+        if split == "train":
+            data = data[teacher_valid_size:-dev_size]
+        elif split == "valid":
+            data = data[-dev_size:-student_test_size]
+        elif split == "test":
+            data = data[-student_test_size:]
+    return data
+
+
 def load_data(
     setup: str,
     split: str,
@@ -35,23 +58,9 @@ def load_data(
     rng = random.RandomState(seed)
     rng.shuffle(data)
 
-    # We resplit data according to teacher/student dichotomy
-    # note that the teacher doesn't have a test split
-    if setup == "no_teacher":
-        if split == "train":
-            pass
-        elif split == "valid":
-            data = data[:teacher_valid_size]
-        elif split == "test":
-            raise ValueError("teacher model doesn't have a test split")
-    else:
-        dev_size = student_test_size + student_valid_size
-        if split == "train":
-            data = data[teacher_valid_size:-dev_size]
-        elif split == "valid":
-            data = data[-dev_size:-student_test_size]
-        elif split == "test":
-            data = data[-student_test_size:]
+    data = resplit(
+        setup, split, data, teacher_valid_size, student_valid_size, student_test_size
+    )
 
     for sample in data:
         sample["text"] = sample["text"].replace("<br /><br />", " ")

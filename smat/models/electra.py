@@ -57,11 +57,13 @@ class ElectraModel(WrappedModel):
         outputs = self.electra_module.classifier(
             outputs[:, None, :], deterministic=deterministic
         )
+        values = self.get_value_vectors(hidden_states)
 
         state = {
             "outputs": outputs,
             "hidden_states": hidden_states,
             "attentions": attentions,
+            "values": values,
         }
         return outputs, state
 
@@ -93,14 +95,38 @@ class ElectraModel(WrappedModel):
 
         return jax.grad(model_fn)
 
+    def attention_grad_fn(
+        self,
+        inputs,
+    ):
+        def model_fn(attn_weights, word_embeddings, y):
+            _, hidden_states, _ = self.electra_module.roberta.encoder(
+                word_embeddings,
+                inputs["attention_mask"],
+                head_mask=None,
+                attn_weights=attn_weights,
+                output_hidden_states=True,
+                output_attentions=True,
+                unnorm_attention=True,
+                deterministic=True,
+                return_dict=False,
+            )
+            outputs = self.scalarmix(hidden_states, inputs["attention_mask"])
+            outputs = self.electra_module.classifier(
+                outputs[:, None, :], deterministic=True
+            )
+            return jnp.sum(outputs[jnp.arange(outputs.shape[0]), y], axis=0)
+
+        return jax.grad(model_fn)
+
     def extract_embeddings(self, params):
         return (
-            params["params"]["FlaxElectraForSequenceClassificationModule_0"]["electra"][
-                "embeddings"
-            ]["word_embeddings"]["embedding"],
-            params["params"]["FlaxElectraForSequenceClassificationModule_0"]["electra"][
-                "embeddings"
-            ]["position_embeddings"]["embedding"],
+            params["params"]["electra_module"]["electra"]["embeddings"][
+                "word_embeddings"
+            ]["embedding"],
+            params["params"]["electra_module"]["electra"]["embeddings"][
+                "position_embeddings"
+            ]["embedding"],
         )
 
     @staticmethod
@@ -159,3 +185,22 @@ class ElectraModel(WrappedModel):
         params = flax.core.freeze(params)
 
         return classifier, params
+
+    def get_value_vectors(self, hidden_states):
+        values = []
+        for i in range(self.config.num_hidden_layers):
+            hidden_state_layer = hidden_states[i]
+            value_layer = self.electra_module.electra.encoder.layer.layers[
+                i
+            ].attention.self.value
+            head_dim = self.config.hidden_size // self.config.num_attention_heads
+            value_states = (
+                value_layer(hidden_state_layer)
+                .reshape(
+                    hidden_state_layer.shape[:2]
+                    + (self.config.num_attention_heads, head_dim)
+                )
+                .transpose((0, 2, 1, 3))
+            )
+            values.append(value_states)
+        return values

@@ -66,10 +66,13 @@ class RobertaModel(WrappedModel):
         outputs = self.roberta_module.classifier(
             outputs[:, None, :], deterministic=deterministic
         )
+        values = self.get_value_vectors(hidden_states)
+
         state = {
             "outputs": outputs,
             "hidden_states": hidden_states,
             "attentions": attentions,
+            "values": values,
         }
         return outputs, state
 
@@ -81,7 +84,7 @@ class RobertaModel(WrappedModel):
         def model_fn(word_embeddings, y):
             _, hidden_states, _ = self.roberta_module.roberta.encoder(
                 word_embeddings,
-                inputs["attention_mask"],
+                attention_mask=inputs["attention_mask"],
                 head_mask=None,
                 output_hidden_states=True,
                 output_attentions=True,
@@ -101,15 +104,46 @@ class RobertaModel(WrappedModel):
 
         return jax.grad(model_fn)
 
+    # define gradient over attention
+    def attention_grad_fn(
+        self,
+        inputs,
+    ):
+        def model_fn(attn_weights, word_embeddings, y):
+            attention_mask = inputs["attention_mask"]
+
+            _, hidden_states, _ = self.roberta_module.roberta.encoder(
+                word_embeddings,
+                attention_mask,
+                head_mask=None,
+                attn_weights=attn_weights,
+                output_hidden_states=True,
+                output_attentions=True,
+                unnorm_attention=True,
+                deterministic=True,
+                return_dict=False,
+            )
+            outputs = self.scalarmix(hidden_states, attention_mask)
+            outputs = self.roberta_module.classifier(
+                outputs[:, None, :], deterministic=True
+            )
+            # we use sum over batch dimension since
+            # we need batched gradient and because embeddings
+            # on each sample are independent
+            # summing will just retrieve the batched gradient
+            return jnp.sum(outputs[jnp.arange(outputs.shape[0]), y], axis=0)
+
+        return jax.grad(model_fn)
+
     @staticmethod
     def extract_embeddings(params):
         return (
-            params["params"]["FlaxRobertaForSequenceClassificationModule_0"]["roberta"][
-                "embeddings"
-            ]["word_embeddings"]["embedding"],
-            params["params"]["FlaxRobertaForSequenceClassificationModule_0"]["roberta"][
-                "embeddings"
-            ]["position_embeddings"]["embedding"],
+            params["params"]["roberta_module"]["roberta"]["embeddings"][
+                "word_embeddings"
+            ]["embedding"],
+            params["params"]["roberta_module"]["roberta"]["embeddings"][
+                "position_embeddings"
+            ]["embedding"],
         )
 
     @staticmethod
@@ -171,3 +205,22 @@ class RobertaModel(WrappedModel):
         params = flax.core.freeze(params)
 
         return classifier, params
+
+    def get_value_vectors(self, hidden_states):
+        values = []
+        for i in range(self.config.num_hidden_layers):
+            hidden_state_layer = hidden_states[i]
+            value_layer = self.roberta_module.roberta.encoder.layer.layers[
+                i
+            ].attention.self.value
+            head_dim = self.config.hidden_size // self.config.num_attention_heads
+            value_states = (
+                value_layer(hidden_state_layer)
+                .reshape(
+                    hidden_state_layer.shape[:2]
+                    + (self.config.num_attention_heads, head_dim)
+                )
+                .transpose((0, 2, 1, 3))
+            )
+            values.append(value_states)
+        return values
