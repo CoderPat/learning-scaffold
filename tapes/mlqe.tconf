@@ -19,6 +19,7 @@ global {
             attention="attention_explainer"
             gradient_input="gradient_input_explainer"
             integrated_gradients="integrated_gradients_explainer"
+            gradient_norm="gradient_norm_explainer"
     )
     student_explainer=attention_explainer
 
@@ -81,7 +82,7 @@ plan PaperSimulabilityResults {
     reach AverageResults via (NumExamples: *) * (KLDCoeff: 0)
     reach AverageResults via (NumExamples: *) * (KLDCoeff: 5)
     reach AverageResults via (NumExamples: *) * (KLDCoeff: 5) * (BestLayer: true)
-    reach AverageResults via (NumExamples: *) * (KLDCoeff: 0.2) * (TeacherExplainer: gradient_input integrated_gradients)
+    reach AverageResults via (NumExamples: *) * (KLDCoeff: 0.2) * (TeacherExplainer: gradient_norm gradient_input integrated_gradients)
     reach AverageResults via (NumExamples: *) * (KLDCoeff: 5) * (MetaLearn: true) * (MetaLR: 2e-4)
 }
 

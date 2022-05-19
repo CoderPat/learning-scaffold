@@ -25,6 +25,7 @@ task TrainTeacher
       --tokenizer $teacher_arch \
       $train_params \
       --model-dir $teacher_dir \
+      --do-save
 }
 
 task TrainStudent 
@@ -119,6 +120,7 @@ task TrainStudent
       --model-dir $student_dir \
       --teacher-explainer-dir $teacher_expl_dir \
       --explainer-dir $student_expl_dir \
+      --do-save \
       --save-test-outputs $test_outputs \
       --log-teacher-params teacher_expl_params.txt \
       --seed $seed | tee results
