@@ -1,10 +1,9 @@
 
 Scaffold-Maximizing Training (SMaT)
 ===
-[![Python Lint](https://github.com/CoderPat/learning-scaffold/actions/workflows/pylint.yml/badge.svg)](https://github.com/CoderPat/learning-scaffold/actions/workflows/pylint.yml)
 
 This is the official implementation for the paper 
-*[Learning to Scaffold: Optimizing Model Explanations for Teaching](https://coderpat.github.io/public/publications/fernandes22scaffold.pdf)*.
+*Learning to Scaffold: Optimizing Model Explanations for Teaching*.
 
 <hr />
 
@@ -30,8 +29,8 @@ We used both `jax==0.2.24 jaxlib==0.1.72` and `jax==0.3.1 jaxlib==0.3.0+cuda11.c
 
 It also depends on two custom forks. The forks are required because neither Flax nor Transformers allow extracting *unnormalized* attention:
 
-* A [fork of Flax](https://github.com/CoderPat/flax/tree/custom-attention)
-* A [fork of Transformers](https://github.com/CoderPat/transformers/tree/unnormalized-attention)
+* A fork of Flax
+* A fork of Transformers
 
 All requirements except jax can be install by running
 
@@ -111,7 +110,6 @@ python smat/train.py \
 ## Workflows
 
 To run experiments using the workflow manager [ducttape](https://github.com/jhclark/ducttape).
-For parallel jobs, also place [these scripts](https://gist.github.com/CoderPat/daa604ddb3d5a779dc2029509552e013) somewhere in your `$PATH`
 
 The experiments are organized into two files 
 
@@ -129,10 +127,3 @@ Then try running one of the existing plans by executing
 ```bash
 ducttape tapes/main.tape -C $my_tconf -p PaperResults -j $num_jobs
 ```
-
-
-## Annotation Tool for Visual Explanations
-
-We also make the source code for the annotation tool available.
-See the [annotation-tool](https://github.com/CoderPat/annotation-tool) sub-repo for more details.
-
